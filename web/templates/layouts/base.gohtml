@@ -1,0 +1,31 @@
+{{/*
+  Основной каркас страниц.
+  Страница обязана определить блок "content"; блоки "title" и "styles"
+  переопределяются по желанию.
+*/}}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ block "title" . }}{{ .Title }} — {{ .AppName }}{{ end }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    {{ block "styles" . }}{{ end }}
+</head>
+<body class="page">
+    {{ template "header" . }}
+
+    <main class="container">
+        {{ with .Flash }}
+            {{ template "alert" dict "Kind" .Kind "Text" .Text }}
+        {{ end }}
+
+        {{ block "content" . }}
+            <p>Страница не определила блок content.</p>
+        {{ end }}
+    </main>
+
+    {{ template "footer" . }}
+    {{ block "scripts" . }}{{ end }}
+</body>
+</html>

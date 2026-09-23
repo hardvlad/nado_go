@@ -1,0 +1,35 @@
+{{/* Список пользователей: таблица + поиск + постраничная навигация. */}}
+{{ define "content" }}
+<h1>Пользователи</h1>
+
+<form class="filter" method="get" action="/users">
+    <input class="filter__input" type="search" name="search" value="{{ .Search }}"
+           placeholder="Имя или email" aria-label="Поиск">
+    <button class="button" type="submit">Искать</button>
+</form>
+
+{{ if .Users }}
+<table class="table">
+    <thead>
+        <tr><th>ID</th><th>Имя</th><th>Email</th><th>Статус</th><th>Создан</th></tr>
+    </thead>
+    <tbody>
+        {{ range .Users }}
+        <tr>
+            <td>{{ .ID }}</td>
+            <td><a href="/users/{{ .ID }}">{{ .Name }}</a></td>
+            <td>{{ .Email }}</td>
+            <td><span class="badge badge--{{ .Status }}">{{ .Status }}</span></td>
+            <td>{{ formatDate "02.01.2006" .CreatedAt }}</td>
+        </tr>
+        {{ end }}
+    </tbody>
+</table>
+
+{{ template "pagination" dict
+    "Page" .Page "TotalPages" .TotalPages "Total" .Total
+    "Path" "/users" "Search" .Search }}
+{{ else }}
+    {{ template "alert" dict "Kind" "info" "Text" "Пользователи не найдены." }}
+{{ end }}
+{{ end }}

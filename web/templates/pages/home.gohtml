@@ -1,0 +1,20 @@
+{{/* Главная страница. Переменные подставляются из view.Data. */}}
+{{ define "content" }}
+<section class="hero">
+    <h1>{{ .Heading }}</h1>
+    <p class="hero__lead">Скелет веб-приложения на Go: HTML-страницы, JSON API и Microsoft SQL Server.</p>
+</section>
+
+<section class="features">
+    <h2>Что уже внутри</h2>
+    <ul class="features__list">
+        {{ range .Features }}
+            <li class="features__item">{{ . }}</li>
+        {{ else }}
+            <li class="features__item">Список пуст.</li>
+        {{ end }}
+    </ul>
+</section>
+
+{{ template "alert" dict "Kind" "info" "Text" "Настройте .env и примените миграции из каталога migrations/." }}
+{{ end }}

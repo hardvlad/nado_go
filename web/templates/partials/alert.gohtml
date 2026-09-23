@@ -1,0 +1,5 @@
+{{/* Универсальное сообщение. Ожидает dict с ключами Kind и Text:
+     {{ template "alert" dict "Kind" "error" "Text" "Что-то пошло не так" }} */}}
+{{ define "alert" }}
+<div class="alert alert--{{ .Kind | default "info" }}" role="status">{{ .Text }}</div>
+{{ end }}

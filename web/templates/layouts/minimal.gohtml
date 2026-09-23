@@ -1,0 +1,15 @@
+{{/* Облегчённый каркас: без шапки и подвала (страницы входа, письма). */}}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ block "title" . }}{{ .Title }}{{ end }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="page page--minimal">
+    <main class="container container--narrow">
+        {{ block "content" . }}{{ end }}
+    </main>
+</body>
+</html>

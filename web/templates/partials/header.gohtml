@@ -1,0 +1,18 @@
+{{/* Шапка сайта. Подсветка активного пункта — по переменной .Path. */}}
+{{ define "header" }}
+<header class="site-header">
+    <div class="container site-header__inner">
+        <a class="site-header__logo" href="/">{{ .AppName }}</a>
+        <nav class="nav">
+            {{ template "nav-link" dict "Href" "/" "Text" "Главная" "Path" .Path }}
+            {{ template "nav-link" dict "Href" "/users" "Text" "Пользователи" "Path" .Path }}
+            {{ template "nav-link" dict "Href" "/api/v1/users" "Text" "API" "Path" .Path }}
+        </nav>
+    </div>
+</header>
+{{ end }}
+
+{{/* Вложенный partial: partial-ы могут вызывать друг друга. */}}
+{{ define "nav-link" }}
+<a class="nav__link{{ if eq .Path .Href }} nav__link--active{{ end }}" href="{{ .Href }}">{{ .Text }}</a>
+{{ end }}
