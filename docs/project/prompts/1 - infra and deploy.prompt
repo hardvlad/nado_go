@@ -1,0 +1,2 @@
+I have Linux UBUNTU server with Plesk management. I need to setup web server and automatic deployment of the binary of this project to the server when push is done to the master branch. Please explain how to do it in detail and prepare all the
+  needful scripts to be run

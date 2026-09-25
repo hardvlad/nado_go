@@ -1,0 +1,43 @@
+[Unit]
+Description=nado web application
+After=network-online.target
+Wants=network-online.target
+# До первого деплоя бинарника нет — сервис тихо пропускается при загрузке.
+ConditionPathExists=/opt/nado/current/nado
+
+[Service]
+Type=simple
+User=nado
+Group=nado
+WorkingDirectory=/opt/nado/current
+EnvironmentFile=/etc/nado/nado.env
+ExecStart=/opt/nado/current/nado
+
+Restart=on-failure
+RestartSec=3
+
+# SIGTERM запускает безопасное завершение: пауза дренирования (2s в prod) +
+# HTTP_SHUTDOWN_TIMEOUT (20s). Даём запас, прежде чем systemd пошлёт SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+LimitNOFILE=65535
+
+# Изоляция: приложение ничего не пишет на диск и не нуждается в привилегиях.
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

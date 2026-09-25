@@ -1,0 +1,106 @@
+# Тесты и деплой бинарника на сервер при каждом push в master.
+#
+# Секреты репозитория (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST         адрес сервера
+#   DEPLOY_PORT         порт SSH (необязательно, по умолчанию 22)
+#   DEPLOY_USER         пользователь для деплоя (deploy)
+#   DEPLOY_SSH_KEY      приватный ключ, чей публичный ключ добавлен setup-server.sh
+#   DEPLOY_KNOWN_HOSTS  вывод `ssh-keyscan -p <порт> <хост>` — защита от MITM
+name: deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: # ручной повторный деплой из вкладки Actions
+
+# Два деплоя одновременно переключали бы current наперегонки.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APP_ROOT: /opt/nado
+  APP_PORT: "8080"   # должен совпадать с HTTP_ADDR в /etc/nado/nado.env
+  TARGET_ARCH: amd64 # arm64 — для ARM-сервера
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # нужна история и теги для git describe
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0" # статический бинарник, не зависит от glibc сервера
+          GOOS: linux
+        run: |
+          VERSION="$(git describe --tags --always)"
+          RELEASE="$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          GOARCH="$TARGET_ARCH" go build -trimpath \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o dist/nado ./cmd/nado
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "RELEASE=${RELEASE}" >> "$GITHUB_ENV"
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          {
+            echo "Host target"
+            echo "  HostName $DEPLOY_HOST"
+            echo "  Port ${DEPLOY_PORT:-22}"
+            echo "  User $DEPLOY_USER"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  ServerAliveInterval 15"
+          } > ~/.ssh/config
+
+      - name: Upload release
+        run: |
+          ssh target "mkdir -p '${APP_ROOT}/releases/${RELEASE}'"
+          scp -q dist/nado deploy/remote-deploy.sh "target:${APP_ROOT}/releases/${RELEASE}/"
+
+      - name: Activate release
+        run: |
+          ssh target "HEALTH_URL='http://127.0.0.1:${APP_PORT}/healthz' \
+            bash '${APP_ROOT}/releases/${RELEASE}/remote-deploy.sh' '${VERSION}'"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

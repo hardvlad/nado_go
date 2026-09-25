@@ -45,6 +45,9 @@ go build -trimpath -ldflags "-X main.version=$(git describe --tags --always)" -o
 
 Тесты: `go test -race ./...` (проходят без БД — репозиторий подменяется заглушкой).
 
+Деплой: push в `master` собирает и выкладывает бинарник на сервер через GitHub
+Actions — настройка сервера, Plesk и секретов описана в [deploy/README.md](deploy/README.md).
+
 ## Конфигурация
 
 Все параметры — переменные окружения, полный список с комментариями в `.env.example`.
