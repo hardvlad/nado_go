@@ -13,7 +13,7 @@
 | | Prod | Тест |
 |---|---|---|
 | Хост | `https://b2b-authproxy.taxi.yandex.net` | `https://b2b.taxi.tst.yandex.net` |
-| Токен | из ЛК продавца | `y2_AgAAAAD04omrAAAPeAAAAAACRpC94Qk6Z5rUTgOcTgYFECJllXYKFx8` |
+| Токен | из ЛК продавца | `` |
 
 Источник: [доступ к API](https://yandex.ru/support/delivery-profile/ru/api/other-day/access).
 
