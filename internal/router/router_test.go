@@ -101,6 +101,12 @@ func (f *fakeAuth) GetCredentialsByEmail(_ context.Context, email string) (*mode
 	return nil, database.ErrNotFound
 }
 
+func (f *fakeAuth) GetCredentialsByPhone(context.Context, string) (*model.UserCredentials, error) {
+	// Вход по телефону в этих маршрутных тестах не проверяется (нужен OTP);
+	// покрыт юнит-тестами в service. Здесь всегда «не найдено».
+	return nil, database.ErrNotFound
+}
+
 func (f *fakeAuth) TouchLogin(context.Context, int64) error { return nil }
 
 func (f *fakeAuth) Create(_ context.Context, s *model.Session) error {

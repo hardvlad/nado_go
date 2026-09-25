@@ -26,11 +26,14 @@ import (
 
 // Deps — зависимости страниц.
 type Deps struct {
-	Render   *view.Renderer
-	I18n     *i18n.Bundle
-	Plans    *service.PlanCatalog
-	Auth     *service.AuthService
-	Feedback *service.FeedbackService
+	Render      *view.Renderer
+	I18n        *i18n.Bundle
+	Plans       *service.PlanCatalog
+	Auth        *service.AuthService
+	OTP         *service.OTPService
+	Connections *service.ConnectionService
+	Onboarding  *service.KaspiOnboardingService
+	Feedback    *service.FeedbackService
 	// SecureCookies — cookie только по HTTPS и с префиксом __Host-.
 	// В проде обязательно, локально по http — выключено.
 	SecureCookies bool
@@ -72,6 +75,27 @@ func (h *PageHandler) Routes() chi.Router {
 	r.Post("/login", h.wrap(h.LoginSubmit))
 	r.Post("/logout", h.wrap(h.Logout))
 	r.Get("/account", h.wrap(h.Account))
+
+	// Вход и регистрация по телефону с кодом в WhatsApp.
+	if h.OTP != nil {
+		r.Get("/phone", h.wrap(h.PhoneForm))
+		r.Post("/phone", h.wrap(h.PhoneRequest))
+		r.Post("/phone/verify", h.wrap(h.PhoneVerify))
+	}
+
+	// Подключение магазина к Kaspi.
+	if h.Connections != nil {
+		r.Get("/stores/new", h.wrap(h.StoreConnectForm))
+		r.Post("/stores/new", h.wrap(h.StoreConnectSubmit))
+	}
+
+	// Подключение через кабинет Kaspi (служебный сотрудник по SMS-коду владельца).
+	if h.Onboarding != nil {
+		r.Post("/stores/kaspi", h.wrap(h.KaspiCabinetStart))
+		r.Get("/stores/kaspi/{id}", h.wrap(h.KaspiCabinetStatus))
+		r.Post("/stores/kaspi/{id}/code", h.wrap(h.KaspiCabinetCode))
+		r.Post("/stores/kaspi/{id}/merchant", h.wrap(h.KaspiCabinetMerchant))
+	}
 	return r
 }
 
@@ -148,16 +172,21 @@ func (h *PageHandler) ensureLocalizer(r *http.Request) *http.Request {
 // Links — адреса страниц на текущем языке.
 type Links struct {
 	Home, Contact, Register, Login, Logout, Account string
+	Phone, PhoneVerify, StoreNew, KaspiCabinet      string
 }
 
 func linksFor(lang i18n.Lang) Links {
 	return Links{
-		Home:     i18n.Localize(lang, "/"),
-		Contact:  i18n.Localize(lang, "/contact"),
-		Register: i18n.Localize(lang, "/register"),
-		Login:    i18n.Localize(lang, "/login"),
-		Logout:   i18n.Localize(lang, "/logout"),
-		Account:  i18n.Localize(lang, "/account"),
+		Home:         i18n.Localize(lang, "/"),
+		Contact:      i18n.Localize(lang, "/contact"),
+		Register:     i18n.Localize(lang, "/register"),
+		Login:        i18n.Localize(lang, "/login"),
+		Logout:       i18n.Localize(lang, "/logout"),
+		Account:      i18n.Localize(lang, "/account"),
+		Phone:        i18n.Localize(lang, "/phone"),
+		PhoneVerify:  i18n.Localize(lang, "/phone/verify"),
+		StoreNew:     i18n.Localize(lang, "/stores/new"),
+		KaspiCabinet: i18n.Localize(lang, "/stores/kaspi"),
 	}
 }
 

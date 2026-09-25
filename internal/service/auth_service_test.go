@@ -14,23 +14,41 @@ import (
 // memAuthStore — хранилище аккаунтов и сессий в памяти.
 type memAuthStore struct {
 	users    map[string]*model.UserCredentials // по email
+	phones   map[string]*model.UserCredentials // по подтверждённому телефону
 	sessions map[string]*model.Session         // по хешу
 	nextID   int64
 }
 
 func newMemAuthStore() *memAuthStore {
-	return &memAuthStore{users: map[string]*model.UserCredentials{}, sessions: map[string]*model.Session{}}
+	return &memAuthStore{
+		users:    map[string]*model.UserCredentials{},
+		phones:   map[string]*model.UserCredentials{},
+		sessions: map[string]*model.Session{},
+	}
 }
 
 func (m *memAuthStore) CreateWithOwner(_ context.Context, acc *model.Account, u *model.NewUser) (*model.Account, *model.User, error) {
-	if _, ok := m.users[u.Email]; ok {
-		return nil, nil, database.ErrConflict
+	if u.Email != "" {
+		if _, ok := m.users[u.Email]; ok {
+			return nil, nil, database.ErrConflict
+		}
+	}
+	if u.PhoneVerified {
+		if _, ok := m.phones[u.Phone]; ok {
+			return nil, nil, database.ErrConflict
+		}
 	}
 	m.nextID++
 	accID, userID := m.nextID*10, m.nextID
-	m.users[u.Email] = &model.UserCredentials{
+	creds := &model.UserCredentials{
 		UserID: userID, Name: u.Name, Email: u.Email, Status: model.UserStatusActive,
 		PasswordHash: u.PasswordHash, AccountID: accID,
+	}
+	if u.Email != "" {
+		m.users[u.Email] = creds
+	}
+	if u.PhoneVerified {
+		m.phones[u.Phone] = creds
 	}
 	created := *acc
 	created.ID = accID
@@ -39,6 +57,14 @@ func (m *memAuthStore) CreateWithOwner(_ context.Context, acc *model.Account, u 
 
 func (m *memAuthStore) GetCredentialsByEmail(_ context.Context, email string) (*model.UserCredentials, error) {
 	if c, ok := m.users[email]; ok {
+		cp := *c
+		return &cp, nil
+	}
+	return nil, database.ErrNotFound
+}
+
+func (m *memAuthStore) GetCredentialsByPhone(_ context.Context, phone string) (*model.UserCredentials, error) {
+	if c, ok := m.phones[phone]; ok {
 		cp := *c
 		return &cp, nil
 	}
@@ -160,6 +186,34 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	fields, ok := httpx.FieldErrors(err)
 	if !ok || fields["email"].Tag != "email_taken" {
 		t.Fatalf("ожидалась ошибка email_taken, получено %v", err)
+	}
+}
+
+func TestPhoneRegisterAndLogin(t *testing.T) {
+	svc, _ := newAuth(t)
+	ctx := context.Background()
+
+	// Регистрация по телефону (телефон уже подтверждён кодом выше по потоку).
+	token, err := svc.RegisterByPhone(ctx, "Ержан", "8 701 555 44 33", "kk", ClientMeta{})
+	if err != nil {
+		t.Fatalf("RegisterByPhone: %v", err)
+	}
+	if p, err := svc.Authenticate(ctx, token); err != nil || p.UserID == 0 {
+		t.Fatalf("сессия после регистрации по телефону: %+v, %v", p, err)
+	}
+
+	// Повторная регистрация того же номера — ErrPhoneTaken.
+	if _, err := svc.RegisterByPhone(ctx, "Ержан", "+7 701 555 44 33", "kk", ClientMeta{}); !errors.Is(err, ErrPhoneTaken) {
+		t.Fatalf("повтор номера: ожидалась ErrPhoneTaken, получено %v", err)
+	}
+
+	// Вход по тому же номеру в другом формате — успех.
+	if _, err := svc.LoginByPhone(ctx, "87015554433", ClientMeta{}); err != nil {
+		t.Fatalf("LoginByPhone: %v", err)
+	}
+	// Незарегистрированный номер.
+	if _, err := svc.LoginByPhone(ctx, "+7 700 000 00 00", ClientMeta{}); !errors.Is(err, ErrPhoneNotRegistered) {
+		t.Fatalf("незарегистрированный номер: ожидалась ErrPhoneNotRegistered, получено %v", err)
 	}
 }
 

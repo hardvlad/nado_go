@@ -29,12 +29,14 @@ const (
 
 // NewUser — данные для создания пользователя кабинета при регистрации.
 // Хеш пароля уже посчитан сервисом: пароль в открытом виде ниже сервиса не уходит.
+// При регистрации по телефону Email и PasswordHash пусты, а PhoneVerified=true.
 type NewUser struct {
-	Email        string
-	Name         string
-	Phone        string // E.164 или пусто
-	PasswordHash string
-	Locale       string
+	Email         string
+	Name          string
+	Phone         string // E.164 или пусто
+	PasswordHash  string
+	Locale        string
+	PhoneVerified bool
 }
 
 // UserCredentials — то, что нужно для проверки входа.

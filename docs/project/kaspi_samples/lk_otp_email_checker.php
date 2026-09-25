@@ -46,7 +46,7 @@ function connectToImapAndProcess($request): void
     }
 
     $username = 'service@service.pbot.kz';
-    $password = 'Aa712015!';
+    $password = '';
     $mailbox = '{localhost:993/imap/ssl/novalidate-cert/debug}INBOX';
 
     $inbox = @imap_open($mailbox, $username, $password);

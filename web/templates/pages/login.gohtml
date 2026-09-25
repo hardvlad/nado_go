@@ -17,6 +17,7 @@
                 "Autocomplete" "current-password" "Required" true "Max" 128 }}
 
             <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "login.submit" }}</button>
+            <p class="form-card__alt"><a href="{{ .Links.Phone }}">{{ .L.T "login.by_phone" }}</a></p>
             <p class="form-card__footer">{{ .L.T "login.no_account" }} <a href="{{ .Links.Register }}">{{ .L.T "login.register" }}</a></p>
         </form>
     </div>

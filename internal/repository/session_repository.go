@@ -45,6 +45,30 @@ func (r *SessionRepository) GetCredentialsByEmail(ctx context.Context, email str
 	return &c, nil
 }
 
+// GetCredentialsByPhone возвращает данные пользователя с подтверждённым
+// телефоном — для входа по коду. Только подтверждённый номер (phone_verified_at)
+// однозначно определяет пользователя.
+func (r *SessionRepository) GetCredentialsByPhone(ctx context.Context, phone string) (*model.UserCredentials, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT TOP (1) u.id, u.name, ISNULL(u.email, ''), u.status,
+		       ISNULL(u.password_hash, ''), ISNULL(m.account_id, 0)
+		FROM dbo.users u
+		LEFT JOIN dbo.account_members m ON m.user_id = u.id
+		WHERE u.phone = @phone AND u.phone_verified_at IS NOT NULL
+		ORDER BY CASE m.role WHEN 'owner' THEN 0 ELSE 1 END, m.account_id;`
+
+	var c model.UserCredentials
+	err := r.db.QueryRowContext(ctx, query, sql.Named("phone", phone)).
+		Scan(&c.UserID, &c.Name, &c.Email, &c.Status, &c.PasswordHash, &c.AccountID)
+	if err != nil {
+		return nil, fmt.Errorf("repository: учётные данные по телефону: %w", database.MapError(err))
+	}
+	return &c, nil
+}
+
 // TouchLogin запоминает время последнего входа.
 func (r *SessionRepository) TouchLogin(ctx context.Context, userID int64) error {
 	ctx, cancel := r.db.Context(ctx)

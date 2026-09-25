@@ -1,0 +1,21 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "logo" }}</span>
+            <h1 class="page-head__title">{{ .L.T "phone.heading" }}</h1>
+            <p class="page-head__lead">{{ .L.T "phone.lead" }}</p>
+        </header>
+
+        <form class="form-card" method="post" action="{{ .Links.Phone }}" novalidate>
+            {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+            {{ template "field" dict "Form" .Form "Name" "phone" "Label" (.L.T "form.phone") "Type" "tel"
+                "Autocomplete" "tel" "Inputmode" "tel" "Placeholder" "+7 700 123 45 67" "Required" true "Max" 32 }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "phone.submit" }}{{ template "icon" "arrow" }}</button>
+            <p class="form-card__footer"><a href="{{ .Links.Login }}">{{ .L.T "phone.by_email" }}</a></p>
+        </form>
+    </div>
+</section>
+{{ end }}

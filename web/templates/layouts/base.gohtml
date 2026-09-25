@@ -12,6 +12,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{ block "title" . }}{{ .Title }} — nado{{ end }}</title>
     <meta name="description" content="{{ .Description }}">
+    {{ block "head_extra" . }}{{ end }}
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="{{ .Theme.LightMedia }}" media="(prefers-color-scheme: light)" data-light="{{ .Theme.Light }}" data-dark="{{ .Theme.Dark }}">
     <meta name="theme-color" content="{{ .Theme.DarkMedia }}" media="(prefers-color-scheme: dark)" data-light="{{ .Theme.Light }}" data-dark="{{ .Theme.Dark }}">

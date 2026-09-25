@@ -228,8 +228,11 @@ type rowScanner interface {
 
 func scanUser(s rowScanner) (*model.User, error) {
 	var u model.User
-	if err := s.Scan(&u.ID, &u.Email, &u.Name, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	// email теперь может быть NULL (регистрация по телефону).
+	var email sql.NullString
+	if err := s.Scan(&u.ID, &email, &u.Name, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		return nil, err
 	}
+	u.Email = email.String
 	return &u, nil
 }

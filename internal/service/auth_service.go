@@ -35,11 +35,18 @@ type AccountStore interface {
 // SessionStore — учётные данные и сессии.
 type SessionStore interface {
 	GetCredentialsByEmail(ctx context.Context, email string) (*model.UserCredentials, error)
+	GetCredentialsByPhone(ctx context.Context, phone string) (*model.UserCredentials, error)
 	TouchLogin(ctx context.Context, userID int64) error
 	Create(ctx context.Context, s *model.Session) error
 	GetPrincipal(ctx context.Context, idHash []byte) (*model.Principal, error)
 	Delete(ctx context.Context, idHash []byte) error
 }
+
+// Ошибки входа и регистрации по телефону.
+var (
+	ErrPhoneNotRegistered = errors.New("service: телефон не зарегистрирован")
+	ErrPhoneTaken         = errors.New("service: телефон уже зарегистрирован")
+)
 
 // ClientMeta — откуда пришёл запрос; сохраняется в сессии для аудита.
 type ClientMeta struct {
@@ -198,6 +205,76 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (string, error) 
 		httpx.Logger(ctx).Warn("не удалось отметить вход", slog.Int64("user_id", creds.UserID), slog.Any("error", err))
 	}
 	return token, nil
+}
+
+// LoginByPhone открывает сессию пользователю с этим подтверждённым телефоном.
+// Телефон должен быть уже проверен кодом (OTPService.Verify) до вызова.
+// Нет пользователя с таким номером — ErrPhoneNotRegistered.
+func (s *AuthService) LoginByPhone(ctx context.Context, phone string, client ClientMeta) (string, error) {
+	norm, ok := NormalizePhone(phone)
+	if !ok {
+		return "", ErrPhoneNotRegistered
+	}
+	creds, err := s.sessions.GetCredentialsByPhone(ctx, norm)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return "", ErrPhoneNotRegistered
+		}
+		return "", httpx.ErrInternal(err)
+	}
+	if creds.Status != model.UserStatusActive || creds.AccountID == 0 {
+		return "", ErrPhoneNotRegistered
+	}
+	token, err := s.openSession(ctx, creds.UserID, creds.AccountID, client)
+	if err != nil {
+		return "", err
+	}
+	if err := s.sessions.TouchLogin(ctx, creds.UserID); err != nil {
+		httpx.Logger(ctx).Warn("не удалось отметить вход", slog.Int64("user_id", creds.UserID), slog.Any("error", err))
+	}
+	return token, nil
+}
+
+// RegisterByPhone создаёт аккаунт и владельца с подтверждённым телефоном без
+// пароля и открывает сессию. Телефон должен быть уже проверен кодом до вызова.
+func (s *AuthService) RegisterByPhone(ctx context.Context, name, phone, locale string, client ClientMeta) (string, error) {
+	name = strings.TrimSpace(name)
+	if len([]rune(name)) < 2 {
+		return "", httpx.ErrFields(map[string]httpx.FieldError{"name": {Tag: "required"}})
+	}
+	norm, ok := NormalizePhone(phone)
+	if !ok {
+		return "", ErrOTPInvalidPhone
+	}
+
+	acc, user, err := s.accounts.CreateWithOwner(ctx,
+		&model.Account{Name: name, Country: "KZ", PlanCode: "", Status: model.AccountStatusActive},
+		&model.NewUser{Name: name, Phone: norm, PhoneVerified: true, Locale: locale})
+	if err != nil {
+		if errors.Is(err, database.ErrConflict) {
+			// Сработал уникальный индекс на подтверждённый телефон.
+			return "", ErrPhoneTaken
+		}
+		return "", httpx.ErrInternal(err)
+	}
+	return s.openSession(ctx, user.ID, acc.ID, client)
+}
+
+// PhoneRegistered сообщает, есть ли пользователь с таким подтверждённым телефоном.
+// Нужен обработчику, чтобы выбрать между входом и регистрацией.
+func (s *AuthService) PhoneRegistered(ctx context.Context, phone string) (bool, error) {
+	norm, ok := NormalizePhone(phone)
+	if !ok {
+		return false, ErrOTPInvalidPhone
+	}
+	_, err := s.sessions.GetCredentialsByPhone(ctx, norm)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, database.ErrNotFound) {
+		return false, nil
+	}
+	return false, httpx.ErrInternal(err)
 }
 
 // Authenticate возвращает пользователя по токену из cookie.

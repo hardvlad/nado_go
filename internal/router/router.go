@@ -12,7 +12,9 @@ import (
 
 	"nado_go/internal/config"
 	"nado_go/internal/handler/api"
+	"nado_go/internal/handler/jobsapi"
 	"nado_go/internal/handler/web"
+	"nado_go/internal/handler/webhook"
 	"nado_go/internal/httpx"
 	"nado_go/internal/i18n"
 )
@@ -20,13 +22,15 @@ import (
 // Deps — всё, что нужно роутеру. Явные зависимости вместо глобальных
 // переменных: состав маршрутов виден по сигнатуре.
 type Deps struct {
-	Config *config.Config
-	Logger *slog.Logger
-	Static fs.FS
-	I18n   *i18n.Bundle
-	Pages  *web.PageHandler
-	Users  *api.UserHandler
-	Health *api.HealthHandler
+	Config          *config.Config
+	Logger          *slog.Logger
+	Static          fs.FS
+	I18n            *i18n.Bundle
+	Pages           *web.PageHandler
+	Users           *api.UserHandler
+	Health          *api.HealthHandler
+	JobsAPI         *jobsapi.Handler
+	GreenAPIWebhook *webhook.GreenAPI
 }
 
 // New возвращает корневой http.Handler приложения.
@@ -54,6 +58,17 @@ func New(d Deps) http.Handler {
 
 	mountStatic(r, d.Static)
 	mountAPI(r, d)
+
+	// API раздачи заданий удалённым воркерам: отдельный контур, без CORS и CSRF,
+	// аутентификация по токену воркера внутри самого обработчика.
+	if d.JobsAPI != nil {
+		r.Mount("/jobs-api/v1", d.JobsAPI.Routes())
+	}
+
+	// Вебхуки провайдеров: без CSRF, аутентификация по токену в самом обработчике.
+	if d.GreenAPIWebhook != nil {
+		r.Mount("/webhooks/greenapi", d.GreenAPIWebhook.Routes())
+	}
 
 	// NotFound/MethodNotAllowed задаются до Mount: chi передаёт их
 	// вложенным роутерам, у которых нет собственных обработчиков.

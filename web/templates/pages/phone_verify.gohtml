@@ -1,0 +1,28 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "message" }}</span>
+            <h1 class="page-head__title">{{ .L.T "phone.code_heading" }}</h1>
+            <p class="page-head__lead">{{ .L.T "phone.code_sent" "Phone" (index .Form.Values "phone") }}</p>
+        </header>
+
+        <form class="form-card" method="post" action="{{ .Links.PhoneVerify }}" novalidate>
+            {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+            <input type="hidden" name="phone" value="{{ index .Form.Values "phone" }}">
+            <input type="hidden" name="purpose" value="{{ index .Form.Values "purpose" }}">
+
+            {{ template "field" dict "Form" .Form "Name" "code" "Label" (.L.T "phone.code_label") "Type" "text"
+                "Autocomplete" "one-time-code" "Inputmode" "numeric" "Required" true "Max" 6 "Hint" (.L.T "phone.code_hint") }}
+
+            {{ if .NeedName }}
+                {{ template "field" dict "Form" .Form "Name" "name" "Label" (.L.T "form.name") "Type" "text"
+                    "Autocomplete" "name" "Required" true "Min" 2 "Max" 150 "Hint" (.L.T "phone.name_hint") }}
+            {{ end }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "phone.verify_submit" }}</button>
+            <p class="form-card__footer"><a href="{{ .Links.Phone }}">{{ .L.T "phone.change_phone" }}</a></p>
+        </form>
+    </div>
+</section>
+{{ end }}

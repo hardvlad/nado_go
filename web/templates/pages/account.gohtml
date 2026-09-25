@@ -1,4 +1,4 @@
-{{/* Заготовка кабинета продавца: сам кабинет — следующий этап дорожной карты. */}}
+{{/* Кабинет продавца: магазины (D-23) и данные аккаунта. */}}
 {{ define "content" }}
 <section class="section page-section">
     <div class="container">
@@ -6,26 +6,52 @@
             <h1 class="page-head__title">{{ .Welcome }}</h1>
         </header>
 
+        {{ if .Connected }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "account.store_connected") }}{{ end }}
+
         <div class="dashboard">
+            <div class="dashboard__main">
+                <div class="section-head section-head--row">
+                    <h2 class="aside-card__title">{{ .L.T "account.stores_title" }}</h2>
+                    <a class="btn btn--primary btn--sm" href="{{ .Links.StoreNew }}">{{ template "icon" "plug" }}{{ .L.T "account.store_add" }}</a>
+                </div>
+
+                {{ if .Stores }}
+                <ul class="store-list" role="list">
+                    {{ range .Stores }}
+                    <li class="store-card">
+                        <div class="store-card__head">
+                            <span class="store-card__name">{{ .Name }}</span>
+                            <span class="badge badge--{{ if eq .Status "active" }}active{{ else }}muted{{ end }}">{{ .Status }}</span>
+                        </div>
+                        <p class="store-card__slug">{{ .Slug }}.nado.kz</p>
+                        {{ if .Marketplace }}
+                        <p class="store-card__conn">
+                            {{ .Marketplace | upper }} ·
+                            {{ if eq .ConnectionStatus "active" }}{{ $.L.T "account.conn_active" }}
+                            {{ else if eq .ConnectionStatus "invalid" }}<span class="text-danger">{{ $.L.T "account.conn_invalid" }}</span>
+                            {{ else }}{{ $.L.T "account.conn_paused" }}{{ end }}
+                        </p>
+                        <p class="store-card__sync muted small">
+                            {{ if .OrdersSyncAt.IsZero }}{{ $.L.T "account.store_orders_pending" }}
+                            {{ else }}{{ $.L.T "account.store_orders_synced" "At" (formatDate "02.01.2006 15:04" .OrdersSyncAt) }}{{ end }}
+                        </p>
+                        {{ end }}
+                    </li>
+                    {{ end }}
+                </ul>
+                {{ else }}
+                    {{ template "alert" dict "Kind" "info" "Text" (.L.T "account.stores_none") }}
+                {{ end }}
+            </div>
+
             <div class="aside-card">
                 <dl class="props">
                     <dt>{{ .L.T "account.account" }}</dt><dd>{{ .Principal.AccountName }}</dd>
-                    <dt>{{ .L.T "form.email" }}</dt><dd>{{ .Principal.Email }}</dd>
-                    <dt>{{ .L.T "account.plan" }}</dt><dd>{{ .Plan.Name }} · {{ .Plan.Price }} {{ .L.T "pricing.per_month" }}</dd>
+                    {{ with .Principal.Email }}<dt>{{ $.L.T "form.email" }}</dt><dd>{{ . }}</dd>{{ end }}
                 </dl>
                 <form method="post" action="{{ .Links.Logout }}">
                     <button class="btn btn--ghost" type="submit">{{ template "icon" "logout" }}{{ .L.T "account.logout" }}</button>
                 </form>
-            </div>
-
-            <div class="aside-card">
-                {{ template "alert" dict "Kind" "info" "Text" (.L.T "account.wip") }}
-                <h2 class="aside-card__title">{{ .L.T "account.next.title" }}</h2>
-                <ol class="checklist checklist--numbered" role="list">
-                    <li>{{ template "icon" "plug" }}<span>{{ .L.T "account.next.1" }}</span></li>
-                    <li>{{ template "icon" "tag" }}<span>{{ .L.T "account.next.2" }}</span></li>
-                    <li>{{ template "icon" "sliders" }}<span>{{ .L.T "account.next.3" }}</span></li>
-                </ol>
             </div>
         </div>
     </div>

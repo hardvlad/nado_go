@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,10 +15,17 @@ import (
 	"nado_go/internal/config"
 	"nado_go/internal/database"
 	"nado_go/internal/handler/api"
+	"nado_go/internal/handler/jobsapi"
 	"nado_go/internal/handler/web"
+	"nado_go/internal/handler/webhook"
 	"nado_go/internal/i18n"
+	"nado_go/internal/integration/marketplace/kaspi"
+	"nado_go/internal/integration/messaging/greenapi"
+	"nado_go/internal/jobs"
+	"nado_go/internal/mailbox"
 	"nado_go/internal/repository"
 	"nado_go/internal/router"
+	"nado_go/internal/secrets"
 	"nado_go/internal/service"
 	"nado_go/internal/view"
 	webassets "nado_go/web"
@@ -30,11 +38,19 @@ const drainDelay = 2 * time.Second
 
 // App — собранное приложение со всеми зависимостями.
 type App struct {
-	cfg    *config.Config
-	log    *slog.Logger
-	db     *database.DB
-	server *http.Server
-	health *api.HealthHandler
+	cfg     *config.Config
+	log     *slog.Logger
+	db      *database.DB
+	server  *http.Server
+	health  *api.HealthHandler
+	runner  *jobs.Runner    // встроенный воркер локальных задач
+	mailbox *mailbox.Poller // опрос почтового ящика служебных сотрудников (может быть nil)
+
+	// runnerDone закрывается, когда встроенный воркер завершил текущую задачу.
+	// Ждём его перед закрытием БД, иначе задача оборвётся на запросе к базе.
+	runnerDone chan struct{}
+	// mailboxDone закрывается, когда поллер почты остановлен.
+	mailboxDone chan struct{}
 }
 
 // New загружает конфигурацию и создаёт все компоненты.
@@ -90,6 +106,78 @@ func New(ctx context.Context, version string) (*App, error) {
 	}
 	feedbackService := service.NewFeedbackService(repository.NewFeedbackRepository(db))
 
+	// Шифрование секретов, пул WhatsApp и одноразовые коды для входа по телефону.
+	box, err := secrets.New(cfg.Secrets.Key)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	whatsappRepo := repository.NewWhatsAppRepository(db, box)
+	sender := greenapi.New(whatsappRepo, log)
+	// Текст кода на языке пользователя.
+	codeMessage := func(code, lang string) string {
+		l, ok := i18n.Parse(lang)
+		if !ok {
+			l = i18n.Default
+		}
+		return bundle.Localizer(l).T("phone.otp_message", "Code", code)
+	}
+	otpService := service.NewOTPService(
+		repository.NewOTPRepository(db), box, sender, codeMessage, cfg.Messaging.OTPTTL, log)
+
+	// Очередь фоновых задач и раздача заданий удалённым воркерам (D-12, D-23).
+	jobsRepo := jobs.NewRepository(db)
+	runner := jobs.NewRunner(jobsRepo, log)
+	catalogService := service.NewKaspiCatalogService(
+		repository.NewStoreRepository(db), repository.NewMarketplaceProductRepository(db))
+	// Источник кода MFA для воркера — почтовый ящик служебных сотрудников (IMAP).
+	// Коды кладёт поллер (см. Run), выдаёт репозиторий с учётом срока годности.
+	kaspiMFARepo := repository.NewKaspiMFARepository(db)
+	mfaSource := mfaCodeLookup{repo: kaspiMFARepo, ttl: cfg.Mailbox.CodeTTL}
+
+	// Подключение магазинов к Kaspi (официальный Shop API) и импорт заказов.
+	connService := service.NewConnectionService(
+		repository.NewStoreRepository(db), repository.NewMarketplaceOrderRepository(db),
+		box, kaspi.NewOfficial(), jobsRepo, log)
+
+	// Кабинетный онбординг Kaspi: отправка SMS владельцу, создание сотрудника,
+	// приём его пароля из почты, импорт каталога (D-28).
+	onboardingService := service.NewKaspiOnboardingService(
+		repository.NewKaspiOnboardingRepository(db), connService, jobsRepo, box,
+		cfg.Kaspi.EmployeeEmailDomain, log)
+
+	jobsAPI := jobsapi.New(jobsRepo, jobs.NewRunnerRepository(db), catalogService, mfaSource, onboardingService, log)
+
+	// Поллер почты запускается только если ящик сконфигурирован (в dev его обычно
+	// нет — тогда коды MFA и пароли сотрудников не приходят, онбординг не завершается).
+	var mailboxPoller *mailbox.Poller
+	if cfg.Mailbox.Enabled() {
+		mailboxPoller = mailbox.NewPoller(mailbox.Config{
+			Addr:       cfg.Mailbox.Addr,
+			User:       cfg.Mailbox.User,
+			Password:   cfg.Mailbox.Password,
+			Mailbox:    cfg.Mailbox.Folder,
+			ServerName: cfg.Mailbox.ServerName,
+			Poll:       cfg.Mailbox.Poll,
+		}, mailboxSink{codes: kaspiMFARepo, onboarding: onboardingService, log: log}, log)
+	} else {
+		log.Warn("почтовый ящик служебных сотрудников не настроен: коды MFA Kaspi поступать не будут")
+	}
+
+	runner.Register(jobs.KindKaspiImportOrders, func(ctx context.Context, job jobs.Job) (json.RawMessage, error) {
+		var p struct {
+			ConnectionID int64 `json:"connection_id"`
+		}
+		if err := json.Unmarshal(job.Payload, &p); err != nil {
+			return nil, jobs.Permanent(fmt.Errorf("app: payload kaspi.import_orders: %w", err))
+		}
+		created, updated, err := connService.ImportKaspiOrders(ctx, p.ConnectionID)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(map[string]int{"created": created, "updated": updated})
+	})
+
 	health := api.NewHealthHandler(version, map[string]api.Pinger{"database": db})
 
 	handler := router.New(router.Deps{
@@ -102,12 +190,17 @@ func New(ctx context.Context, version string) (*App, error) {
 			I18n:          bundle,
 			Plans:         plans,
 			Auth:          authService,
+			OTP:           otpService,
+			Connections:   connService,
+			Onboarding:    onboardingService,
 			Feedback:      feedbackService,
 			SecureCookies: cfg.IsProduction(),
 			PublicURL:     cfg.App.PublicURL,
 		}),
-		Users:  api.NewUserHandler(userService),
-		Health: health,
+		Users:           api.NewUserHandler(userService),
+		Health:          health,
+		JobsAPI:         jobsAPI,
+		GreenAPIWebhook: webhook.NewGreenAPI(whatsappRepo, cfg.Messaging.GreenAPIWebhookToken, log),
 	})
 
 	server := &http.Server{
@@ -125,7 +218,7 @@ func New(ctx context.Context, version string) (*App, error) {
 	// привязан к сигнальному ctx, иначе при SIGTERM активные запросы
 	// оборвутся мгновенно вместо корректного дренирования.
 
-	return &App{cfg: cfg, log: log, db: db, server: server, health: health}, nil
+	return &App{cfg: cfg, log: log, db: db, server: server, health: health, runner: runner, mailbox: mailboxPoller}, nil
 }
 
 // Run обслуживает запросы до отмены ctx, затем выполняет безопасное завершение.
@@ -135,6 +228,23 @@ func New(ctx context.Context, version string) (*App, error) {
 // которые ещё ходят в базу.
 func (a *App) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
+
+	// Встроенный воркер локальных задач. По отмене ctx он перестаёт брать
+	// новые задачи; текущую дорабатывает, поэтому БД закрываем только после него.
+	a.runnerDone = make(chan struct{})
+	go func() {
+		defer close(a.runnerDone)
+		_ = a.runner.Run(ctx)
+	}()
+
+	// Поллер почты (если ящик настроен): по отмене ctx он завершится сам.
+	if a.mailbox != nil {
+		a.mailboxDone = make(chan struct{})
+		go func() {
+			defer close(a.mailboxDone)
+			a.mailbox.Run(ctx)
+		}()
+	}
 
 	go func() {
 		a.log.Info("HTTP-сервер слушает", slog.String("addr", a.cfg.HTTP.Addr))
@@ -191,9 +301,55 @@ func (a *App) shutdown(errCh <-chan error) error {
 	return errors.Join(errs...)
 }
 
+// mfaCodeLookup выдаёт воркеру код подтверждения входа в кабинет по адресу
+// служебного сотрудника, учитывая срок годности кода. Реализует mfaCodeSource
+// из handler/jobsapi.
+type mfaCodeLookup struct {
+	repo *repository.KaspiMFARepository
+	ttl  time.Duration
+}
+
+func (l mfaCodeLookup) CodeForEmail(ctx context.Context, email string) (string, bool, error) {
+	return l.repo.Latest(ctx, email, l.ttl)
+}
+
+// mailboxSink принимает то, что поллер вычитал из писем. Коды подтверждения
+// входа сохраняются в kaspi_mfa_codes; пароль нового сотрудника передаётся в
+// онбординг (там он шифруется и ставится импорт каталога).
+type mailboxSink struct {
+	codes      *repository.KaspiMFARepository
+	onboarding *service.KaspiOnboardingService
+	log        *slog.Logger
+}
+
+func (s mailboxSink) SaveCode(ctx context.Context, email, code string) error {
+	return s.codes.Insert(ctx, email, code)
+}
+
+func (s mailboxSink) SaveCredentials(ctx context.Context, login, password string) error {
+	// Пароль в лог не пишем — только в зашифрованное хранилище через сервис.
+	return s.onboarding.SetEmployeePassword(ctx, login, password)
+}
+
 // closeResources закрывает внешние ресурсы. Вызывается один раз, после того
 // как HTTP-сервер перестал обрабатывать запросы.
 func (a *App) closeResources() {
+	// Дожидаемся встроенного воркера: его текущая задача может ходить в БД.
+	if a.runnerDone != nil {
+		select {
+		case <-a.runnerDone:
+		case <-time.After(a.cfg.HTTP.ShutdownTimeout):
+			a.log.Warn("встроенный воркер не завершился в отведённое время")
+		}
+	}
+	// И поллера почты: он тоже обращается к БД (сохранение кодов).
+	if a.mailboxDone != nil {
+		select {
+		case <-a.mailboxDone:
+		case <-time.After(a.cfg.HTTP.ShutdownTimeout):
+			a.log.Warn("поллер почты не завершился в отведённое время")
+		}
+	}
 	if err := a.db.Close(); err != nil {
 		a.log.Error("ошибка закрытия пула БД", slog.Any("error", err))
 	}

@@ -1,0 +1,65 @@
+{{ define "head_extra" }}
+    {{/* Пока идёт фоновый шаг — обновляем страницу, чтобы показать следующий экран. */}}
+    {{ if or (eq .Onb.Status "started") (eq .Onb.Status "verifying") (eq .Onb.Status "employee_created") (eq .Onb.Status "catalog_queued") }}
+    <meta http-equiv="refresh" content="5">
+    {{ end }}
+{{ end }}
+
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "box" }}</span>
+            <h1 class="page-head__title">{{ .L.T "stores.cabinet_title" }}</h1>
+            <p class="page-head__lead">{{ .Onb.StoreName }}</p>
+        </header>
+
+        {{ with .Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+        <div class="form-card">
+            {{ if eq .Onb.Status "started" }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_sending" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_sending_hint" "Phone" .Onb.Phone }}</p>
+
+            {{ else if eq .Onb.Status "otp_sent" }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_code" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_code_hint" "Phone" .Onb.Phone }}</p>
+                <form method="post" action="{{ .Links.KaspiCabinet }}/{{ .Onb.ID }}/code" novalidate>
+                    {{ template "field" dict "Form" .Form "Name" "code" "Label" (.L.T "phone.code_label") "Type" "text"
+                        "Autocomplete" "one-time-code" "Inputmode" "numeric" "Required" true "Max" 8 }}
+                    <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "phone.verify_submit" }}</button>
+                </form>
+
+            {{ else if eq .Onb.Status "verifying" }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_verifying" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_wait" }}</p>
+
+            {{ else if eq .Onb.Status "need_merchant" }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_merchant" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_merchant_hint" }}</p>
+                <form method="post" action="{{ .Links.KaspiCabinet }}/{{ .Onb.ID }}/merchant" novalidate>
+                    <div class="field">
+                        {{ range .Onb.Merchants }}
+                        <label class="field__label"><input type="radio" name="merchant" value="{{ .UID }}" required> {{ .Name }}</label>
+                        {{ end }}
+                    </div>
+                    <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "stores.merchant_submit" }}</button>
+                </form>
+
+            {{ else if or (eq .Onb.Status "employee_created") (eq .Onb.Status "catalog_queued") }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_importing" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_importing_hint" }}</p>
+                <p class="form-card__footer"><a href="{{ .Links.Account }}">{{ .L.T "stores.go_account" }}</a></p>
+
+            {{ else if eq .Onb.Status "done" }}
+                {{ template "alert" dict "Kind" "success" "Text" (.L.T "stores.st_done") }}
+                <p class="form-card__footer"><a href="{{ .Links.Account }}">{{ .L.T "stores.go_account" }}</a></p>
+
+            {{ else if eq .Onb.Status "failed" }}
+                {{ template "alert" dict "Kind" "danger" "Text" (or .Onb.Error (.L.T "stores.st_failed")) }}
+                <p class="form-card__footer"><a href="{{ .Links.StoreNew }}">{{ .L.T "stores.retry" }}</a></p>
+            {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}

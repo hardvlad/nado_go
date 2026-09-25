@@ -1,0 +1,42 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "box" }}</span>
+            <h1 class="page-head__title">{{ .L.T "stores.connect_heading" }}</h1>
+            <p class="page-head__lead">{{ .L.T "stores.connect_lead" }}</p>
+        </header>
+
+        {{ if .CabinetEnabled }}
+        <form class="form-card" method="post" action="{{ .Links.KaspiCabinet }}" novalidate>
+            <h2 class="form-card__title">{{ .L.T "stores.cabinet_heading" }}</h2>
+            <p class="form-card__hint">{{ .L.T "stores.cabinet_lead" }}</p>
+            {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+            {{ template "field" dict "Form" .Form "Name" "cab_name" "Label" (.L.T "stores.name_label") "Type" "text"
+                "Required" true "Min" 2 "Max" 200 "Hint" (.L.T "stores.name_hint") }}
+            {{ template "field" dict "Form" .Form "Name" "phone" "Label" (.L.T "stores.phone_label") "Type" "tel"
+                "Autocomplete" "tel" "Inputmode" "tel" "Required" true "Max" 32 "Hint" (.L.T "stores.phone_hint") }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "stores.cabinet_submit" }}{{ template "icon" "arrow" }}</button>
+        </form>
+
+        <p class="section__divider">{{ .L.T "stores.or_token" }}</p>
+        {{ end }}
+
+        <form class="form-card" method="post" action="{{ .Links.StoreNew }}" novalidate>
+            <h2 class="form-card__title">{{ .L.T "stores.token_heading" }}</h2>
+            <p class="form-card__hint">{{ .L.T "stores.token_lead" }}</p>
+            {{ if not .CabinetEnabled }}{{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}{{ end }}
+
+            {{ template "field" dict "Form" .Form "Name" "name" "Label" (.L.T "stores.name_label") "Type" "text"
+                "Required" true "Min" 2 "Max" 200 "Hint" (.L.T "stores.name_hint") }}
+            {{ template "field" dict "Form" .Form "Name" "token" "Label" (.L.T "stores.token_label") "Type" "text"
+                "Required" true "Max" 400 "Hint" (.L.T "stores.token_hint") }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "stores.connect_submit" }}{{ template "icon" "arrow" }}</button>
+            <p class="form-card__footer"><a href="{{ .Links.Account }}">{{ .L.T "error.home" }}</a></p>
+        </form>
+    </div>
+</section>
+{{ end }}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"nado_go/internal/database"
 	"nado_go/internal/model"
@@ -30,18 +31,19 @@ func (r *AccountRepository) CreateWithOwner(ctx context.Context, acc *model.Acco
 
 	err := r.db.WithTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx *sql.Tx) error {
 		const insertUser = `
-			INSERT INTO dbo.users (email, name, status, password_hash, phone, locale)
+			INSERT INTO dbo.users (email, name, status, password_hash, phone, phone_verified_at, locale)
 			OUTPUT INSERTED.id, INSERTED.email, INSERTED.name,
 			       INSERTED.status, INSERTED.created_at, INSERTED.updated_at
-			VALUES (@email, @name, @status, @password_hash, @phone, @locale);`
+			VALUES (@email, @name, @status, @password_hash, @phone, @phone_verified_at, @locale);`
 
 		var err error
 		createdUser, err = scanUser(tx.QueryRowContext(ctx, insertUser,
-			sql.Named("email", strings.ToLower(owner.Email)),
+			sql.Named("email", nullString(strings.ToLower(owner.Email))),
 			sql.Named("name", owner.Name),
 			sql.Named("status", model.UserStatusActive),
-			sql.Named("password_hash", owner.PasswordHash),
+			sql.Named("password_hash", nullString(owner.PasswordHash)),
 			sql.Named("phone", nullString(owner.Phone)),
+			sql.Named("phone_verified_at", verifiedAt(owner.PhoneVerified)),
 			sql.Named("locale", nullString(owner.Locale)),
 		))
 		if err != nil {
@@ -88,3 +90,11 @@ func (r *AccountRepository) CreateWithOwner(ctx context.Context, acc *model.Acco
 func nullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
 }
+
+// verifiedAt — время подтверждения телефона (сейчас) или NULL.
+func verifiedAt(verified bool) sql.NullTime {
+	return sql.NullTime{Time: time.Now().UTC(), Valid: verified}
+}
+
+// nullInt64 превращает 0 в NULL — для необязательных внешних ключей.
+func nullInt64(v int64) sql.NullInt64 { return sql.NullInt64{Int64: v, Valid: v != 0} }

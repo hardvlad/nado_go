@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,9 +15,58 @@ import (
 )
 
 type Config struct {
-	App      App
-	HTTP     HTTP
-	Database Database
+	App       App
+	HTTP      HTTP
+	Database  Database
+	Secrets   Secrets
+	Messaging Messaging
+	Mailbox   Mailbox
+	Kaspi     Kaspi
+}
+
+// Kaspi — параметры кабинетного онбординга Kaspi (D-28).
+type Kaspi struct {
+	// EmployeeEmailDomain — домен адресов служебных сотрудников (catch-all ящик,
+	// см. Mailbox). Адреса вида s{onboardingID}-{rand}@<домен>. Пусто — кабинетный
+	// онбординг недоступен.
+	EmployeeEmailDomain string
+}
+
+// Mailbox — общий почтовый ящик служебных сотрудников Kaspi (IMAP). Из писем
+// читаются коды подтверждения входа в кабинет и пароли новых сотрудников.
+// Ящик — инфраструктура платформы (catch-all), к продавцам не привязан.
+type Mailbox struct {
+	Addr       string        // host:port IMAPS, напр. mail.nado.kz:993
+	User       string        // логин ящика
+	Password   string        // пароль ящика
+	Folder     string        // папка, обычно INBOX
+	ServerName string        // имя для проверки TLS, если отличается от хоста
+	Poll       time.Duration // период опроса
+	// CodeTTL — сколько код из письма считается пригодным при выдаче воркеру и
+	// как долго он хранится до очистки.
+	CodeTTL time.Duration
+}
+
+// Enabled — ящик сконфигурирован (заданы адрес и логин). Пусто — поллер не
+// запускается, коды MFA недоступны (в dev это нормально).
+func (m Mailbox) Enabled() bool { return m.Addr != "" && m.User != "" }
+
+// Secrets — ключ шифрования секретов провайдеров (токены инстансов WhatsApp,
+// учётные данные маркетплейсов) и HMAC одноразовых кодов.
+type Secrets struct {
+	// Key — 32 байта для AES-256-GCM (SECRETS_KEY, base64). В prod обязателен.
+	Key []byte
+}
+
+// Messaging — отправка сообщений (OTP при регистрации).
+type Messaging struct {
+	OTPTTL time.Duration // срок жизни кода
+	// Партнёрский доступ GreenAPI — для создания инстансов пула.
+	GreenAPIPartnerDomain string
+	GreenAPIPartnerToken  string
+	// GreenAPIWebhookToken — секрет в URL вебхука, по нему сервер проверяет,
+	// что уведомление о статусе инстанса пришло от GreenAPI.
+	GreenAPIWebhookToken string
 }
 
 type App struct {
@@ -103,7 +153,31 @@ func Load() (*Config, error) {
 			ConnectTimeout:         envDuration("DB_CONNECT_TIMEOUT", 10*time.Second),
 			QueryTimeout:           envDuration("DB_QUERY_TIMEOUT", 5*time.Second),
 		},
+		Messaging: Messaging{
+			OTPTTL:                envDuration("OTP_TTL", 5*time.Minute),
+			GreenAPIPartnerDomain: env("GREEN_API_PARTNER_DOMAIN", ""),
+			GreenAPIPartnerToken:  env("GREEN_API_PARTNER_TOKEN", ""),
+			GreenAPIWebhookToken:  env("GREEN_API_WEBHOOK_TOKEN", ""),
+		},
+		Mailbox: Mailbox{
+			Addr:       env("MAILBOX_IMAP_ADDR", ""),
+			User:       env("MAILBOX_IMAP_USER", ""),
+			Password:   env("MAILBOX_IMAP_PASSWORD", ""),
+			Folder:     env("MAILBOX_IMAP_FOLDER", "INBOX"),
+			ServerName: env("MAILBOX_IMAP_SERVER_NAME", ""),
+			Poll:       envDuration("MAILBOX_IMAP_POLL", 15*time.Second),
+			CodeTTL:    envDuration("MAILBOX_CODE_TTL", 10*time.Minute),
+		},
+		Kaspi: Kaspi{
+			EmployeeEmailDomain: env("KASPI_EMPLOYEE_EMAIL_DOMAIN", "kaspi.nado.kz"),
+		},
 	}
+
+	key, err := secretsKey(env("SECRETS_KEY", ""), cfg.IsProduction())
+	if err != nil {
+		return nil, err
+	}
+	cfg.Secrets.Key = key
 
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -112,6 +186,29 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) IsProduction() bool { return strings.EqualFold(c.App.Env, "prod") }
+
+// devSecretsKey — ключ для локальной разработки, когда SECRETS_KEY не задан.
+// Только вне prod: зашифрованное им в dev-базе не имеет ценности.
+var devSecretsKey = []byte("nado-dev-secrets-key-32-bytes!!!")
+
+// secretsKey разбирает SECRETS_KEY (base64, 32 байта). В prod ключ обязателен;
+// локально при его отсутствии используется фиксированный dev-ключ.
+func secretsKey(raw string, prod bool) ([]byte, error) {
+	if raw == "" {
+		if prod {
+			return nil, fmt.Errorf("config: SECRETS_KEY обязателен в prod (base64, 32 байта)")
+		}
+		return devSecretsKey, nil
+	}
+	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(raw))
+	if err != nil {
+		return nil, fmt.Errorf("config: SECRETS_KEY — некорректный base64: %w", err)
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("config: SECRETS_KEY должен быть 32 байта, получено %d", len(key))
+	}
+	return key, nil
+}
 
 func (c *Config) validate() error {
 	if c.Database.Name == "" {
@@ -131,6 +228,13 @@ func (c *Config) validate() error {
 	if c.Database.MaxIdleConns > c.Database.MaxOpenConns {
 		return fmt.Errorf("config: DB_MAX_IDLE_CONNS (%d) больше DB_MAX_OPEN_CONNS (%d)",
 			c.Database.MaxIdleConns, c.Database.MaxOpenConns)
+	}
+	// Ящик служебных сотрудников либо выключен целиком, либо задан полностью:
+	// без пароля поллер молча не смог бы войти и коды MFA не приходили бы.
+	if c.Mailbox.Addr != "" || c.Mailbox.User != "" || c.Mailbox.Password != "" {
+		if c.Mailbox.Addr == "" || c.Mailbox.User == "" || c.Mailbox.Password == "" {
+			return fmt.Errorf("config: для почтового ящика нужны MAILBOX_IMAP_ADDR, MAILBOX_IMAP_USER и MAILBOX_IMAP_PASSWORD")
+		}
 	}
 	return nil
 }

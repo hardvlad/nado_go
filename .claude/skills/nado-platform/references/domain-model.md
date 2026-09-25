@@ -10,12 +10,12 @@
 
 | Таблица | Ключевые поля | Примечания |
 |---|---|---|
-| `accounts` | 🔑id, name, country (`RU`/`KZ`), region, plan_code, status, created_at | Арендатор: продавец, ИП или компания. `region` определяет, в какой инсталляции хранятся ПД (см. open-questions) |
-| `users` | 🔑id, email (unique), password_hash, name, locale, ui_theme (`system`/`light`/`dark`), status | Пользователь кабинета; может состоять в нескольких аккаунтах |
+| `accounts` | 🔑id, name, country (`RU`/`KZ`), region, status, created_at | Владелец и логин (D-23). Группирует магазины и участников. Тариф здесь больше НЕ хранится — он на магазине |
+| `users` | 🔑id, email (unique), password_hash, phone, phone_verified_at, name, locale, ui_theme (`system`/`light`/`dark`), status | Пользователь кабинета; может состоять в нескольких аккаунтах |
 | `account_members` | 🔑(account_id, user_id), role (`owner`/`admin`/`manager`/`viewer`) | Роли проверяются в service |
 | `sessions` | 🔑id (случайные 32 байта, хранится хеш), user_id, account_id, expires_at, ip, user_agent | Серверные сессии кабинета, cookie `HttpOnly; Secure; SameSite=Lax` |
-| `subscriptions` | 🔑id, acc, plan_code, status, current_period_end, provider, external_id | Биллинг платформы (D-06) |
-| `plans` | 🔑code, limits (JSON: stores, products, connections, custom_domain...) | Справочник тарифов |
+| `subscriptions` | 🔑id, store_id, plan_code, status, current_period_end, provider, external_id | Подписка **на магазин** (D-23). Нет оплаты → магазин отключается |
+| `plans` | 🔑code, limits (JSON: products, connections, custom_domain...) | Справочник тарифов; лимиты в пределах одного магазина |
 
 ## Магазины
 
@@ -37,7 +37,13 @@
 |---|---|---|
 | `provider_credentials` | 🔑id, acc, kind (`marketplace`/`payment`/`fiscal`/`delivery`), provider_code, secret_ciphertext VARBINARY, key_version, public_meta (JSON), expires_at, status, last_verified_at | Секрет — только в зашифрованном виде; `public_meta` — то, что можно показать (shopId, имя кабинета) |
 
-## Каталог (уровень аккаунта)
+## Каталог (уровень магазина, D-23)
+
+Таблицы каталога арендуются по `store_id` (не по аккаунту). Ниже `acc` в
+каталоге читай как `store_id` + денормализованный `account_id` для проверки
+владения. Магазин связан ровно с одним кабинетом маркетплейса, поэтому склейки
+товаров между маркетплейсами внутри магазина нет.
+
 
 | Таблица | Ключевые поля | Примечания |
 |---|---|---|
@@ -57,7 +63,8 @@
 
 | Таблица | Ключевые поля | Примечания |
 |---|---|---|
-| `marketplace_connections` | 🔑id, acc, marketplace (`wildberries`/`ozon`/`yandex_market`/`kaspi`), credentials_id, name, status, content_sync_at, offers_sync_at, settings (JSON: склады, курсы, правила цен) | Одно подключение на кабинет |
+| `marketplace_connections` | 🔑id, store_id (**UNIQUE**), acc, marketplace (`wildberries`/`ozon`/`yandex_market`/`kaspi`), credentials_id, name, status, content_sync_at, offers_sync_at, settings (JSON) | Один-к-одному с магазином (D-23) |
+| `whatsapp_instances` | 🔑id, provider (`greenapi`), domain, instance_id, token (шифр.), phone, state, disabled, last_ok_at | **Пул платформы для OTP** (D-23), не привязан к продавцу; берётся активный |
 | `product_sources` | 🔑id, acc, connection_id, product_id, variant_id NULL, external_id, external_group_id, content_hash, raw_json, removed_at, synced_at | `UNIQUE (connection_id, external_id)`; хранится только последний снимок |
 | `sync_runs` | 🔑id, acc, connection_id, kind (`content`/`offers`/`file`), status, started_at, finished_at, stats (JSON), error | История для кабинета; старые записи чистятся |
 | `sync_issues` | 🔑id, sync_run_id, external_id, severity, code, message | Проблемы по конкретным карточкам |

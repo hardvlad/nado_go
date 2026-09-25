@@ -8,6 +8,7 @@ import (
 
 	"nado_go/internal/httpx"
 	"nado_go/internal/i18n"
+	"nado_go/internal/model"
 	"nado_go/internal/service"
 	"nado_go/internal/tenant"
 )
@@ -243,8 +244,21 @@ func (h *PageHandler) Account(w http.ResponseWriter, r *http.Request) error {
 	if pl, ok := h.Plans.Get(p.PlanCode); ok {
 		plan = h.planView(l, pl)
 	}
+
+	// Магазины продавца (D-23): у каждого своё подключение к маркетплейсу.
+	var stores []model.Store
+	if h.Connections != nil {
+		var err error
+		stores, err = h.Connections.Stores(r.Context(), p.AccountID)
+		if err != nil {
+			return err
+		}
+	}
+
 	data := h.page(r, "account.title").
 		With("Plan", plan).
-		With("Welcome", l.T("account.welcome", "Name", p.UserName))
+		With("Welcome", l.T("account.welcome", "Name", p.UserName)).
+		With("Stores", stores).
+		With("Connected", r.URL.Query().Get("connected") == "1")
 	return h.Render.Render(w, http.StatusOK, "account", data)
 }
