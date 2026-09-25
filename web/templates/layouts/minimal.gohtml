@@ -1,14 +1,18 @@
-{{/* Облегчённый каркас: без шапки и подвала (страницы входа, письма). */}}
+{{/* Облегчённый каркас без шапки и подвала: для служебных страниц. */}}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ .Lang }}"{{ if eq .Theme.Mode "light" "dark" }} data-theme="{{ .Theme.Mode }}"{{ end }}>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ block "title" . }}{{ .Title }}{{ end }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ block "title" . }}{{ .Title }} — nado{{ end }}</title>
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="/static/img/favicon.svg?v={{ .Version }}" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/css/tokens.css?v={{ .Version }}">
+    <link rel="stylesheet" href="/static/css/app.css?v={{ .Version }}">
 </head>
-<body class="page page--minimal">
-    <main class="container container--narrow">
+<body class="page--minimal">
+    {{ template "icons" }}
+    <main id="main" class="container container--narrow">
         {{ block "content" . }}{{ end }}
     </main>
 </body>

@@ -24,6 +24,9 @@ type App struct {
 	Env      string // local | dev | prod
 	LogLevel slog.Level
 	Debug    bool // в debug-режиме шаблоны перечитываются с диска на каждый запрос
+	// PublicURL — адрес сайта без слеша в конце (https://nado.kz) для
+	// canonical и hreflang. Пусто — ссылки относительные (локальная разработка).
+	PublicURL string
 }
 
 type HTTP struct {
@@ -68,10 +71,11 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		App: App{
-			Name:     env("APP_NAME", "nado"),
-			Env:      env("APP_ENV", "local"),
-			LogLevel: logLevel(env("LOG_LEVEL", "info")),
-			Debug:    envBool("APP_DEBUG", true),
+			Name:      env("APP_NAME", "nado"),
+			Env:       env("APP_ENV", "local"),
+			LogLevel:  logLevel(env("LOG_LEVEL", "info")),
+			Debug:     envBool("APP_DEBUG", true),
+			PublicURL: strings.TrimSuffix(env("APP_PUBLIC_URL", ""), "/"),
 		},
 		HTTP: HTTP{
 			Addr:              env("HTTP_ADDR", ":8080"),

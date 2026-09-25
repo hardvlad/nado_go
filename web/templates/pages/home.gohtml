@@ -1,20 +1,181 @@
-{{/* Главная страница. Переменные подставляются из view.Data. */}}
+{{/* Лендинг платформы nado. Тексты — в internal/i18n/locales, данные — в handler/web/landing.go. */}}
+{{ define "title" }}nado — {{ .L.T "meta.brand_tagline" }}{{ end }}
+
 {{ define "content" }}
 <section class="hero">
-    <h1>{{ .Heading }}</h1>
-    <p class="hero__lead">Скелет веб-приложения на Go: HTML-страницы, JSON API и Microsoft SQL Server.</p>
+    <div class="container hero__grid">
+        <div class="hero__copy">
+            <p class="pill">{{ template "icon" "sparkles" }}<span>{{ .L.T "home.hero.badge" }}</span></p>
+            <h1 class="hero__title">
+                {{ .L.T "home.hero.title_1" }}
+                <span class="gradient-text">{{ .L.T "home.hero.title_2" }}</span>
+            </h1>
+            <p class="hero__lead">{{ .L.T "home.hero.lead" }}</p>
+            <div class="hero__actions">
+                <a class="btn btn--primary btn--lg" href="{{ .Links.Register }}">{{ .L.T "home.hero.cta_primary" }}{{ template "icon" "arrow" }}</a>
+                <a class="btn btn--ghost btn--lg" href="#pricing">{{ .L.T "home.hero.cta_secondary" }}</a>
+            </div>
+            <p class="hero__note">{{ template "icon" "check" }}<span>{{ .L.T "home.hero.note" }}</span></p>
+        </div>
+
+        {{/* Иллюстрация: макет витрины из токенов, без картинок — одинаково хорош в обеих темах. */}}
+        <div class="hero__visual" aria-hidden="true">
+            <div class="mock">
+                <div class="mock__bar"><span></span><span></span><span></span><em>{{ .L.T "home.mock.store" }}</em></div>
+                <div class="mock__body">
+                    <div class="mock__media">{{ template "icon" "box" }}</div>
+                    <div class="mock__info">
+                        <p class="mock__title">{{ .L.T "home.mock.product" }}</p>
+                        <p class="mock__price">24 990 ₸ <s>27 490 ₸</s></p>
+                        <p class="mock__hint">{{ .L.T "home.mock.price_old" }}</p>
+                        <span class="mock__button">{{ template "icon" "cart" }}{{ .L.T "home.mock.buy" }}</span>
+                    </div>
+                </div>
+                <div class="mock__skeleton"><span></span><span></span><span></span></div>
+            </div>
+            <div class="float-card float-card--order">
+                <span class="float-card__icon float-card__icon--success">{{ template "icon" "check" }}</span>
+                <span><strong>{{ .L.T "home.mock.order" }}</strong><small>{{ .L.T "home.mock.paid" }}</small></span>
+            </div>
+            <div class="float-card float-card--sync">
+                <span class="float-card__icon">{{ template "icon" "refresh" }}</span>
+                <span><small>{{ .L.T "home.mock.synced" }}</small></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container marketplaces">
+        <p class="marketplaces__title">{{ .L.T "home.marketplaces.title" }}</p>
+        <ul class="marketplaces__list" role="list">
+            {{ range .Marketplaces }}<li class="chip">{{ . }}</li>{{ end }}
+        </ul>
+    </div>
 </section>
 
-<section class="features">
-    <h2>Что уже внутри</h2>
-    <ul class="features__list">
-        {{ range .Features }}
-            <li class="features__item">{{ . }}</li>
-        {{ else }}
-            <li class="features__item">Список пуст.</li>
-        {{ end }}
-    </ul>
+<section class="stats" aria-label="nado">
+    <div class="container stats__grid">
+        <div class="stat"><span class="stat__value">0%</span><span class="stat__label">{{ .L.T "home.stats.commission" }}</span></div>
+        <div class="stat"><span class="stat__value">4</span><span class="stat__label">{{ .L.T "home.stats.marketplaces" }}</span></div>
+        <div class="stat"><span class="stat__value">3</span><span class="stat__label">{{ .L.T "home.stats.languages" }}</span></div>
+    </div>
 </section>
 
-{{ template "alert" dict "Kind" "info" "Text" "Настройте .env и примените миграции из каталога migrations/." }}
+<section class="section" id="how">
+    <div class="container">
+        <header class="section-head">
+            <h2 class="section-head__title">{{ .L.T "home.how.title" }}</h2>
+            <p class="section-head__lead">{{ .L.T "home.how.lead" }}</p>
+        </header>
+        <ol class="steps" role="list">
+            {{ range $i, $s := .Steps }}
+            <li class="step">
+                <span class="step__num">{{ add $i 1 }}</span>
+                <span class="step__icon">{{ template "icon" $s.Icon }}</span>
+                <h3 class="step__title">{{ $s.Title }}</h3>
+                <p class="step__text">{{ $s.Text }}</p>
+            </li>
+            {{ end }}
+        </ol>
+    </div>
+</section>
+
+<section class="section section--alt" id="features">
+    <div class="container">
+        <header class="section-head">
+            <p class="eyebrow">{{ .L.T "home.sellers.eyebrow" }}</p>
+            <h2 class="section-head__title">{{ .L.T "home.sellers.title" }}</h2>
+            <p class="section-head__lead">{{ .L.T "home.sellers.lead" }}</p>
+        </header>
+        <ul class="cards" role="list">
+            {{ range .SellerBenefits }}
+            <li class="card">
+                <span class="card__icon">{{ template "icon" .Icon }}</span>
+                <h3 class="card__title">{{ .Title }}</h3>
+                <p class="card__text">{{ .Text }}</p>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
+</section>
+
+<section class="section" id="buyers">
+    <div class="container">
+        <header class="section-head">
+            <p class="eyebrow eyebrow--accent">{{ .L.T "home.buyers.eyebrow" }}</p>
+            <h2 class="section-head__title">{{ .L.T "home.buyers.title" }}</h2>
+            <p class="section-head__lead">{{ .L.T "home.buyers.lead" }}</p>
+        </header>
+        <ul class="cards cards--4" role="list">
+            {{ range .BuyerBenefits }}
+            <li class="card card--accent">
+                <span class="card__icon">{{ template "icon" .Icon }}</span>
+                <h3 class="card__title">{{ .Title }}</h3>
+                <p class="card__text">{{ .Text }}</p>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
+</section>
+
+<section class="section section--alt" id="pricing">
+    <div class="container">
+        <header class="section-head">
+            <p class="eyebrow">{{ .L.T "pricing.eyebrow" }}</p>
+            <h2 class="section-head__title">{{ .L.T "pricing.title" }}</h2>
+            <p class="section-head__lead">{{ .L.T "pricing.lead" }}</p>
+        </header>
+        <div class="plans">
+            {{ range .Plans }}
+            <article class="plan{{ if .Popular }} plan--popular{{ end }}" aria-labelledby="plan-{{ .Code }}">
+                {{ if .Popular }}<p class="plan__badge">{{ $.L.T "pricing.popular" }}</p>{{ end }}
+                <h3 class="plan__name" id="plan-{{ .Code }}">{{ .Name }}</h3>
+                <p class="plan__tagline">{{ .Tagline }}</p>
+                <p class="plan__price"><span class="plan__amount">{{ .Price }}</span> <span class="plan__period">{{ $.L.T "pricing.per_month" }}</span></p>
+                <a class="btn btn--block {{ if .Popular }}btn--primary{{ else }}btn--outline{{ end }}" href="{{ .URL }}">{{ $.L.T "pricing.choose" }}</a>
+                <ul class="plan__features" role="list">
+                    {{ range .Features }}
+                    <li class="plan__feature{{ if not .Included }} plan__feature--off{{ end }}">
+                        {{ if .Included }}{{ template "icon" "check" }}<span class="sr-only">{{ $.L.T "pricing.included" }}: </span>
+                        {{ else }}{{ template "icon" "minus" }}<span class="sr-only">{{ $.L.T "pricing.not_included" }}: </span>{{ end }}
+                        <span>{{ .Text }}</span>
+                    </li>
+                    {{ end }}
+                </ul>
+            </article>
+            {{ end }}
+        </div>
+    </div>
+</section>
+
+<section class="section" id="faq">
+    <div class="container container--narrow">
+        <header class="section-head">
+            <p class="eyebrow">{{ .L.T "faq.eyebrow" }}</p>
+            <h2 class="section-head__title">{{ .L.T "faq.title" }}</h2>
+        </header>
+        <div class="faq">
+            {{ range .FAQ }}
+            <details class="faq__item">
+                <summary class="faq__q"><span>{{ .Q }}</span>{{ template "icon" "chevron" }}</summary>
+                <p class="faq__a">{{ .A }}</p>
+            </details>
+            {{ end }}
+        </div>
+    </div>
+</section>
+
+<section class="section section--tight">
+    <div class="container">
+        <div class="cta">
+            <div>
+                <h2 class="cta__title">{{ .L.T "home.cta.title" }}</h2>
+                <p class="cta__text">{{ .L.T "home.cta.text" }}</p>
+            </div>
+            <div class="cta__actions">
+                <a class="btn btn--inverse btn--lg" href="{{ .Links.Register }}">{{ .L.T "home.cta.button" }}{{ template "icon" "arrow" }}</a>
+                <a class="btn btn--inverse-ghost btn--lg" href="{{ .Links.Contact }}">{{ .L.T "home.cta.contact" }}</a>
+            </div>
+        </div>
+    </div>
+</section>
 {{ end }}

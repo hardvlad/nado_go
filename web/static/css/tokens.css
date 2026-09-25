@@ -1,0 +1,151 @@
+/*
+  Дизайн-токены nado — единственный файл, где задаются цвета (D-21, скилл nado-ui-design).
+  Компоненты используют только var(--...). Имена токенов одинаковы в светлой и тёмной теме.
+
+  Тёмные значения записаны дважды: для явного выбора (data-theme="dark") и для режима
+  «как в системе». Тест web/tokens_test.go проверяет, что блоки совпадают, что каждый токен
+  есть в обеих темах и что пары текст/фон проходят WCAG 2.2 AA.
+*/
+
+:root {
+    color-scheme: light;
+
+    --color-bg: #f6f7f9;
+    --color-surface: #ffffff;
+    --color-surface-2: #f0f2f5;
+    --color-text: #1b1f24;
+    --color-text-muted: #5c6673;
+    --color-border: #e2e5ea;
+    --color-border-strong: #848e9c;
+
+    --color-primary: #2563d9;
+    --color-primary-hover: #1d4bb0;
+    --color-on-primary: #ffffff;
+    --color-primary-soft: #e6eefc;
+
+    --color-accent: #0b7d68;
+    --color-accent-soft: #e2f4ef;
+
+    --color-success: #1d7a45;
+    --color-success-bg: #e6f5ec;
+    --color-warning: #8a5a00;
+    --color-warning-bg: #fff4d6;
+    --color-danger: #b02a2a;
+    --color-danger-bg: #fdeaea;
+    --color-info: #1f5fbf;
+    --color-info-bg: #e8f0fd;
+
+    --color-media-bg: #ffffff;
+    --color-focus: #2563d9;
+    --color-overlay: rgb(16 24 40 / 0.45);
+    --color-header-bg: rgb(255 255 255 / 0.82);
+    --color-glow-1: rgb(37 99 217 / 0.20);
+    --color-glow-2: rgb(11 125 104 / 0.16);
+
+    --shadow-1: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.10);
+    --shadow-2: 0 4px 12px rgb(16 24 40 / 0.08), 0 2px 4px rgb(16 24 40 / 0.06);
+    --shadow-3: 0 24px 48px -12px rgb(16 24 40 / 0.22);
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-bg: #0f1115;
+    --color-surface: #171a20;
+    --color-surface-2: #1f232b;
+    --color-text: #e6e8eb;
+    --color-text-muted: #9aa4b2;
+    --color-border: #2c313a;
+    --color-border-strong: #646c78;
+
+    --color-primary: #7aa5ff;
+    --color-primary-hover: #9dbcff;
+    --color-on-primary: #0f1115;
+    --color-primary-soft: #1a2540;
+
+    --color-accent: #4fd1b5;
+    --color-accent-soft: #12302a;
+
+    --color-success: #5fd08e;
+    --color-success-bg: #12291c;
+    --color-warning: #f2c14e;
+    --color-warning-bg: #2e2410;
+    --color-danger: #ff8a8a;
+    --color-danger-bg: #331616;
+    --color-info: #8ab4ff;
+    --color-info-bg: #14213a;
+
+    --color-media-bg: #f2f3f5;
+    --color-focus: #9dbcff;
+    --color-overlay: rgb(0 0 0 / 0.6);
+    --color-header-bg: rgb(15 17 21 / 0.80);
+    --color-glow-1: rgb(122 165 255 / 0.16);
+    --color-glow-2: rgb(79 209 181 / 0.12);
+
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.40);
+    --shadow-2: 0 4px 12px rgb(0 0 0 / 0.35);
+    --shadow-3: 0 24px 48px -12px rgb(0 0 0 / 0.60);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+
+        --color-bg: #0f1115;
+        --color-surface: #171a20;
+        --color-surface-2: #1f232b;
+        --color-text: #e6e8eb;
+        --color-text-muted: #9aa4b2;
+        --color-border: #2c313a;
+        --color-border-strong: #646c78;
+
+        --color-primary: #7aa5ff;
+        --color-primary-hover: #9dbcff;
+        --color-on-primary: #0f1115;
+        --color-primary-soft: #1a2540;
+
+        --color-accent: #4fd1b5;
+        --color-accent-soft: #12302a;
+
+        --color-success: #5fd08e;
+        --color-success-bg: #12291c;
+        --color-warning: #f2c14e;
+        --color-warning-bg: #2e2410;
+        --color-danger: #ff8a8a;
+        --color-danger-bg: #331616;
+        --color-info: #8ab4ff;
+        --color-info-bg: #14213a;
+
+        --color-media-bg: #f2f3f5;
+        --color-focus: #9dbcff;
+        --color-overlay: rgb(0 0 0 / 0.6);
+        --color-header-bg: rgb(15 17 21 / 0.80);
+        --color-glow-1: rgb(122 165 255 / 0.16);
+        --color-glow-2: rgb(79 209 181 / 0.12);
+
+        --shadow-1: 0 1px 2px rgb(0 0 0 / 0.40);
+        --shadow-2: 0 4px 12px rgb(0 0 0 / 0.35);
+        --shadow-3: 0 24px 48px -12px rgb(0 0 0 / 0.60);
+    }
+}
+
+/* Размеры, радиусы, шрифты — не зависят от темы. */
+:root {
+    --radius-s: 6px;
+    --radius-m: 10px;
+    --radius-l: 16px;
+    --radius-xl: 24px;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 72px;
+
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+    --container: 1180px;
+    --header-h: 64px;
+}

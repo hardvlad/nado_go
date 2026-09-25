@@ -1,8 +1,38 @@
 {{ define "footer" }}
 <footer class="site-footer">
-    <div class="container">
-        <span>© {{ year }} {{ .AppName }}</span>
-        <span class="site-footer__env">env: {{ .Env }} · версия: {{ .Version }}</span>
+    <div class="container site-footer__grid">
+        <div class="site-footer__brand">
+            <a class="logo" href="{{ .Links.Home }}" aria-label="{{ .L.T "nav.home" }}">
+                <span class="logo__mark">{{ template "icon" "logo" }}</span>
+                <span class="logo__text">nado</span>
+            </a>
+            <p class="muted">{{ .L.T "footer.tagline" }}</p>
+        </div>
+
+        <nav class="site-footer__col" aria-label="{{ .L.T "footer.product" }}">
+            <h2 class="site-footer__title">{{ .L.T "footer.product" }}</h2>
+            <a href="{{ .Links.Home }}#features">{{ .L.T "nav.features" }}</a>
+            <a href="{{ .Links.Home }}#pricing">{{ .L.T "nav.pricing" }}</a>
+            <a href="{{ .Links.Home }}#faq">{{ .L.T "nav.faq" }}</a>
+        </nav>
+
+        <nav class="site-footer__col" aria-label="{{ .L.T "footer.company" }}">
+            <h2 class="site-footer__title">{{ .L.T "footer.company" }}</h2>
+            <a href="{{ .Links.Contact }}">{{ .L.T "nav.contact" }}</a>
+            <a href="{{ .Links.Login }}">{{ .L.T "nav.login" }}</a>
+            <a href="{{ .Links.Register }}">{{ .L.T "nav.register" }}</a>
+        </nav>
+
+        <div class="site-footer__col">
+            <h2 class="site-footer__title">{{ .L.T "nav.language" }}</h2>
+            {{ range .LangLinks }}
+                <a href="{{ .URL }}" hreflang="{{ .Lang }}" lang="{{ .Lang }}"{{ if .Current }} aria-current="true"{{ end }}>{{ .Name }}</a>
+            {{ end }}
+        </div>
+    </div>
+    <div class="container site-footer__bottom">
+        <span>{{ .L.T "footer.rights" "Year" .Year }}</span>
+        <span class="site-footer__version">v{{ .Version }}</span>
     </div>
 </footer>
 {{ end }}

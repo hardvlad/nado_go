@@ -1,8 +1,10 @@
 {{ define "content" }}
-<section class="error-page">
-    <p class="error-page__status">{{ .Status }}</p>
-    <h1>{{ .Heading }}</h1>
-    <p>{{ .Message }}</p>
-    <a class="button" href="/">На главную</a>
+<section class="section page-section">
+    <div class="container container--form error-page">
+        <p class="error-page__status">{{ .Status }}</p>
+        <h1 class="page-head__title">{{ .Title }}</h1>
+        <p class="page-head__lead">{{ .Message }}</p>
+        <a class="btn btn--primary" href="{{ .Links.Home }}">{{ .L.T "error.home" }}</a>
+    </div>
 </section>
 {{ end }}

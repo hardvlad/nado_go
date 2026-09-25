@@ -1,0 +1,24 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "logo" }}</span>
+            <h1 class="page-head__title">{{ .L.T "login.heading" }}</h1>
+            <p class="page-head__lead">{{ .L.T "login.lead" }}</p>
+        </header>
+
+        <form class="form-card" method="post" action="{{ .Links.Login }}" novalidate>
+            {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+            {{ with index .Form.Values "next" }}<input type="hidden" name="next" value="{{ . }}">{{ end }}
+
+            {{ template "field" dict "Form" .Form "Name" "email" "Label" (.L.T "form.email") "Type" "email"
+                "Autocomplete" "email" "Required" true "Max" 255 }}
+            {{ template "field" dict "Form" .Form "Name" "password" "Label" (.L.T "form.password") "Type" "password"
+                "Autocomplete" "current-password" "Required" true "Max" 128 }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "login.submit" }}</button>
+            <p class="form-card__footer">{{ .L.T "login.no_account" }} <a href="{{ .Links.Register }}">{{ .L.T "login.register" }}</a></p>
+        </form>
+    </div>
+</section>
+{{ end }}

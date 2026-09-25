@@ -1,6 +1,9 @@
 # nado
 
-Скелет веб-приложения на Go: HTML-страницы, JSON API и Microsoft SQL Server.
+Платформа интернет-магазинов для продавцов маркетплейсов (nado.kz): Go, HTML-страницы
+на шаблонах, JSON API и Microsoft SQL Server. Сейчас готовы лендинг с тарифами,
+обратная связь, регистрация и вход продавца — на русском, казахском и английском,
+в светлой и тёмной теме. Продуктовые решения и план — в `.claude/skills/nado-platform`.
 
 ## Структура
 
@@ -11,8 +14,12 @@ internal/
   config/            конфигурация из переменных окружения и .env
   database/          пул соединений к SQL Server, транзакции, маппинг ошибок
   handler/api/       JSON-обработчики (users, health)
-  handler/web/       обработчики HTML-страниц
-  httpx/             транспортный слой: ошибки, ответы, middleware, валидация
+  handler/web/       HTML-страницы: лендинг, обратная связь, регистрация, вход, кабинет
+  httpx/             транспортный слой: ошибки, ответы, middleware, валидация, лимиты
+  i18n/              переводы (locales/ru|kk|en.json) и язык в URL
+  money/             суммы в минорных единицах и их форматирование
+  password/          хеширование паролей (Argon2id)
+  tenant/            вошедший пользователь и его аккаунт в контексте запроса
   model/             доменные сущности
   repository/        SQL-запросы (единственное место, где есть SQL)
   router/            дерево маршрутов и цепочка middleware
@@ -20,7 +27,7 @@ internal/
   view/              движок шаблонов (layout + partials + страницы)
 web/
   templates/         layouts/, partials/, pages/
-  static/            css, js, изображения
+  static/            css (tokens.css — единственный файл с цветами), js, изображения
 migrations/          SQL-скрипты схемы
 ```
 
@@ -31,11 +38,13 @@ migrations/          SQL-скрипты схемы
 
 ```powershell
 Copy-Item .env.example .env      # и заполнить доступы к БД
-sqlcmd -S localhost -d nado -U sa -P '<пароль>' -i migrations/0001_init.sql
+sqlcmd -S localhost -d nado -U sa -P '<пароль>' -C -i migrations/0001_init.sql
+sqlcmd -S localhost -d nado -U sa -P '<пароль>' -C -i migrations/0002_accounts_auth_feedback.sql
 go run ./cmd/nado
 ```
 
-Открыть `http://localhost:8080` — страницы, `http://localhost:8080/api/v1/users` — API.
+Открыть `http://localhost:8080` — сайт (`/kk` — казахский, `/en` — английский),
+`http://localhost:8080/api/v1/users` — учебный API (только вне prod).
 
 Сборка одного файла со встроенными шаблонами и статикой:
 
@@ -43,7 +52,10 @@ go run ./cmd/nado
 go build -trimpath -ldflags "-X main.version=$(git describe --tags --always)" -o bin/nado.exe ./cmd/nado
 ```
 
-Тесты: `go test -race ./...` (проходят без БД — репозиторий подменяется заглушкой).
+Тесты: `go test -race ./...` (проходят без БД — хранилища подменяются заглушками).
+Они же проверяют, что у всех ключей есть переводы на трёх языках, что у светлой и
+тёмной темы одинаковый набор токенов и контраст WCAG AA, и что в CSS нет цветов
+мимо токенов.
 
 Деплой: push в `master` собирает и выкладывает бинарник на сервер через GitHub
 Actions — настройка сервера, Plesk и секретов описана в [deploy/README.md](deploy/README.md).
@@ -56,7 +68,8 @@ Actions — настройка сервера, Plesk и секретов опи�
 | Переменная | Значение |
 |---|---|
 | `APP_DEBUG` | `true` — шаблоны читаются с диска на каждый запрос, логи текстом |
-| `APP_ENV` | `prod` включает JSON-логи, HSTS, паузу дренирования и строгую проверку конфига |
+| `APP_ENV` | `prod` включает JSON-логи, HSTS, `Secure`-cookie с префиксом `__Host-`, паузу дренирования и строгую проверку конфига |
+| `APP_PUBLIC_URL` | адрес сайта (`https://nado.kz`) для `canonical` и `hreflang`; пусто — относительные ссылки |
 | `HTTP_SHUTDOWN_TIMEOUT` | сколько ждать завершения активных запросов при остановке |
 | `DB_QUERY_TIMEOUT` | таймаут по умолчанию для каждого SQL-запроса |
 | `DB_MAX_OPEN_CONNS` | размер пула; должен быть не меньше `DB_MAX_IDLE_CONNS` |
@@ -94,7 +107,7 @@ Actions — настройка сервера, Plesk и секретов опи�
 |---|---|---|
 | `GET` | `/healthz` | процесс жив |
 | `GET` | `/readyz` | готов принимать трафик (проверяет БД) |
-| `GET` | `/api/v1/users?page=&per_page=&search=&status=` | список с пагинацией |
+| `GET` | `/api/v1/users?page=&per_page=&search=&status=` | список с пагинацией (учебный ресурс, только вне prod) |
 | `POST` | `/api/v1/users` | создание |
 | `GET` | `/api/v1/users/{id}` | карточка |
 | `PUT` | `/api/v1/users/{id}` | изменение |
@@ -113,21 +126,22 @@ Actions — настройка сервера, Plesk и секретов опи�
 
 ```
 web/templates/layouts/base.gohtml     каркас: <html>, <head>, общая разметка
-web/templates/partials/*.gohtml       переиспользуемые блоки: header, footer, alert, pagination
+web/templates/partials/*.gohtml       переиспользуемые блоки: header, footer, icons, field, alert
 web/templates/pages/<name>.gohtml     содержимое страницы: {{ define "content" }}
 ```
 
 Переменные передаются через `view.Data`:
 
 ```go
-data := view.NewData(r, "Пользователи").
-    With("Users", users).
-    With("Total", total)
+data := h.page(r, "contact.title").   // общие переменные: язык, тема, ссылки, пользователь
+    With("Form", form).
+    With("Topics", topics)
 
-return h.render.Render(w, http.StatusOK, "users", data) // pages/users.gohtml
+return h.Render.Render(w, http.StatusOK, "contact", data) // pages/contact.gohtml
 ```
 
-В шаблоне — `{{ .Users }}`, `{{ .Total }}`. Переменные из `view.WithGlobals`
+В шаблоне — `{{ .Form }}`, тексты — `{{ .L.T "contact.heading" }}` (ключи в
+`internal/i18n/locales/*.json`, русский — источник истины). Переменные из `view.WithGlobals`
 (`AppName`, `Env`, `Version`) доступны на каждой странице без явной передачи.
 
 Подключение шаблона из другого файла:
@@ -150,6 +164,17 @@ return h.render.Render(w, http.StatusOK, "users", data) // pages/users.gohtml
 компилируются все сочетания layout×страница (`Warmup`): опечатка в шаблоне
 валит приложение сразу, а не в проде на запросе пользователя.
 
+## Сайт: языки и темы
+
+* Язык — префикс URL: без префикса русский, `/kk`, `/en`. Одни и те же маршруты
+  монтируются под каждый префикс; переключатель ведёт на ту же страницу, в `<head>` —
+  `hreflang` для поисковиков.
+* Тема — светлая, тёмная или «как в системе» (cookie `nado_theme`). Сервер сразу
+  ставит `data-theme`, поэтому страница не мигает. Цвета — только токены из
+  `web/static/css/tokens.css` (правила — скилл `nado-ui-design`).
+* Страницы работают без JavaScript: меню — `<details>`, формы — обычный POST с
+  переходом по 303 (Post/Redirect/Get). Скрипты только улучшают: тема, закрытие меню.
+
 ## Безопасность
 
 * Экранирование по умолчанию (`html/template`); `safeHTML` — только для доверенного
@@ -163,3 +188,8 @@ return h.render.Render(w, http.StatusOK, "users", data) // pages/users.gohtml
 * Паника в обработчике не роняет процесс: `httpx.Recoverer` логирует стек и
   отдаёт `500`.
 * В prod конфигурация не пускает пустой пароль БД и `DB_TRUST_SERVER_CERTIFICATE=true`.
+* Формы защищены от межсайтовой подделки (CSRF) через `http.CrossOriginProtection`
+  (заголовки `Sec-Fetch-Site`/`Origin`) и `SameSite=Lax` у cookie сессии.
+* Пароли — Argon2id; в БД хранится только SHA-256 токена сессии. Вход, регистрация
+  и обратная связь ограничены по частоте (по IP и по email), в формах есть ловушка
+  для ботов. Ошибка входа не раскрывает, существует ли email.

@@ -1,0 +1,70 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container split split--auth">
+        <div class="split__main">
+            <header class="page-head">
+                <h1 class="page-head__title">{{ .L.T "register.heading" }}</h1>
+                <p class="page-head__lead">{{ .L.T "register.lead" }}</p>
+            </header>
+
+            <form class="form-card" method="post" action="{{ .Links.Register }}" novalidate>
+                {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+                {{ template "field" dict "Form" .Form "Name" "company" "Label" (.L.T "form.company") "Type" "text"
+                    "Autocomplete" "organization" "Required" true "Min" 2 "Max" 200 }}
+                <div class="form-grid">
+                    {{ template "field" dict "Form" .Form "Name" "name" "Label" (.L.T "form.name") "Type" "text"
+                        "Autocomplete" "name" "Required" true "Min" 2 "Max" 150 }}
+                    {{ template "field" dict "Form" .Form "Name" "phone" "Label" (.L.T "form.phone") "Type" "tel"
+                        "Autocomplete" "tel" "Inputmode" "tel" "Placeholder" "+7 700 123 45 67" "Max" 32
+                        "Optional" (.L.T "form.optional") "Hint" (.L.T "form.phone_hint") }}
+                </div>
+                {{ template "field" dict "Form" .Form "Name" "email" "Label" (.L.T "form.email") "Type" "email"
+                    "Autocomplete" "email" "Required" true "Max" 255 }}
+                {{ template "field" dict "Form" .Form "Name" "password" "Label" (.L.T "form.password") "Type" "password"
+                    "Autocomplete" "new-password" "Required" true "Min" 8 "Max" 128 "Hint" (.L.T "form.password_hint") }}
+
+                {{- $planErr := index .Form.Errors "plan" }}
+                <fieldset class="field plan-picker{{ if $planErr }} field--invalid{{ end }}">
+                    <legend class="field__label">{{ .L.T "form.plan" }}</legend>
+                    <div class="plan-picker__options">
+                        {{ range .Plans }}
+                        <label class="plan-option">
+                            <input type="radio" name="plan" value="{{ .Code }}"{{ if eq .Code (index $.Form.Values "plan") }} checked{{ end }}>
+                            <span class="plan-option__body">
+                                <span class="plan-option__name">{{ .Name }}{{ if .Popular }} <span class="badge">{{ $.L.T "pricing.popular" }}</span>{{ end }}</span>
+                                <span class="plan-option__price">{{ .Price }} <small>{{ $.L.T "pricing.per_month" }}</small></span>
+                            </span>
+                        </label>
+                        {{ end }}
+                    </div>
+                    {{ with $planErr }}<p class="field__error">{{ . }}</p>{{ end }}
+                </fieldset>
+
+                {{ template "checkbox" dict "Form" .Form "Name" "consent" "Label" (.L.T "register.consent") }}
+                {{ template "honeypot" (.L.T "form.honeypot") }}
+
+                <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "register.submit" }}{{ template "icon" "arrow" }}</button>
+                <p class="form-card__footer">{{ .L.T "register.have_account" }} <a href="{{ .Links.Login }}">{{ .L.T "register.login" }}</a></p>
+            </form>
+        </div>
+
+        <aside class="split__aside">
+            {{/* Сводка по каждому тарифу; видна выбранная. site.js переключает её
+                 при смене тарифа в форме, без скрипта видна выбранная сервером. */}}
+            {{ range .Plans }}
+            <div class="aside-card aside-card--plan" data-plan-summary="{{ .Code }}"{{ if ne .Code $.SelectedPlan.Code }} hidden{{ end }}>
+                <p class="eyebrow">{{ $.L.T "register.plan_summary" }}</p>
+                <h2 class="aside-card__title">{{ .Name }}</h2>
+                <p class="plan__price"><span class="plan__amount">{{ .Price }}</span> <span class="plan__period">{{ $.L.T "pricing.per_month" }}</span></p>
+                <ul class="plan__features" role="list">
+                    {{ range .Features }}{{ if .Included }}
+                    <li class="plan__feature">{{ template "icon" "check" }}<span>{{ .Text }}</span></li>
+                    {{ end }}{{ end }}
+                </ul>
+            </div>
+            {{ end }}
+        </aside>
+    </div>
+</section>
+{{ end }}

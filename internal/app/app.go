@@ -15,6 +15,7 @@ import (
 	"nado_go/internal/database"
 	"nado_go/internal/handler/api"
 	"nado_go/internal/handler/web"
+	"nado_go/internal/i18n"
 	"nado_go/internal/repository"
 	"nado_go/internal/router"
 	"nado_go/internal/service"
@@ -70,9 +71,24 @@ func New(ctx context.Context, version string) (*App, error) {
 		return nil, fmt.Errorf("app: статические файлы: %w", err)
 	}
 
+	bundle, err := i18n.NewBundle()
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
 	// Сборка слоёв снизу вверх: репозиторий → сервис → обработчик.
 	userRepo := repository.NewUserRepository(db)
 	userService := service.NewUserService(userRepo)
+
+	plans := service.NewPlanCatalog()
+	sessionRepo := repository.NewSessionRepository(db)
+	authService, err := service.NewAuthService(repository.NewAccountRepository(db), sessionRepo, plans)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	feedbackService := service.NewFeedbackService(repository.NewFeedbackRepository(db))
 
 	health := api.NewHealthHandler(version, map[string]api.Pinger{"database": db})
 
@@ -80,7 +96,16 @@ func New(ctx context.Context, version string) (*App, error) {
 		Config: cfg,
 		Logger: log,
 		Static: staticFS,
-		Pages:  web.NewPageHandler(renderer, userService),
+		I18n:   bundle,
+		Pages: web.NewPageHandler(web.Deps{
+			Render:        renderer,
+			I18n:          bundle,
+			Plans:         plans,
+			Auth:          authService,
+			Feedback:      feedbackService,
+			SecureCookies: cfg.IsProduction(),
+			PublicURL:     cfg.App.PublicURL,
+		}),
 		Users:  api.NewUserHandler(userService),
 		Health: health,
 	})

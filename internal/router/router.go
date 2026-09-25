@@ -14,6 +14,7 @@ import (
 	"nado_go/internal/handler/api"
 	"nado_go/internal/handler/web"
 	"nado_go/internal/httpx"
+	"nado_go/internal/i18n"
 )
 
 // Deps — всё, что нужно роутеру. Явные зависимости вместо глобальных
@@ -22,6 +23,7 @@ type Deps struct {
 	Config *config.Config
 	Logger *slog.Logger
 	Static fs.FS
+	I18n   *i18n.Bundle
 	Pages  *web.PageHandler
 	Users  *api.UserHandler
 	Health *api.HealthHandler
@@ -62,7 +64,25 @@ func New(d Deps) http.Handler {
 	// CSP смысла не имеет.
 	r.Group(func(r chi.Router) {
 		r.Use(httpx.SecurityHeaders(d.Config.IsProduction()))
-		r.Mount("/", d.Pages.Routes())
+
+		// Защита форм от межсайтовой подделки запросов (CSRF): POST с чужого
+		// сайта — и с поддоменов магазинов *.nado.kz — отклоняется по
+		// заголовкам Sec-Fetch-Site / Origin. Вместе с SameSite=Lax у cookie
+		// сессии этого достаточно, отдельные токены в формах не нужны.
+		cop := http.NewCrossOriginProtection()
+		cop.SetDenyHandler(http.HandlerFunc(d.Pages.Forbidden))
+		r.Use(cop.Handler)
+
+		r.Use(d.Pages.Session)
+
+		// Одни и те же страницы на каждом языке: /, /kk, /en.
+		for _, lang := range i18n.Supported() {
+			prefix := lang.Prefix()
+			if prefix == "" {
+				prefix = "/"
+			}
+			r.With(d.I18n.Middleware(lang)).Mount(prefix, d.Pages.Routes())
+		}
 	})
 
 	return r
@@ -90,7 +110,12 @@ func mountAPI(r chi.Router, d Deps) {
 				"Метод не поддерживается для этого ресурса"))
 		})
 
-		r.Mount("/users", d.Users.Routes())
+		// Учебный CRUD пользователей из скелета не защищён авторизацией, а в
+		// таблице users теперь живые продавцы. Поэтому в проде он выключен;
+		// локально остаётся как пример ресурса API.
+		if !d.Config.IsProduction() {
+			r.Mount("/users", d.Users.Routes())
+		}
 	})
 }
 

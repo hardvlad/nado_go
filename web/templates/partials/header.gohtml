@@ -1,18 +1,90 @@
-{{/* Шапка сайта. Подсветка активного пункта — по переменной .Path. */}}
+{{/*
+  Шапка сайта: логотип, разделы лендинга, язык, тема, вход.
+  На узких экранах разделы и кнопки уходят в меню-«бургер» (<details>),
+  которое работает и без JavaScript.
+*/}}
 {{ define "header" }}
 <header class="site-header">
     <div class="container site-header__inner">
-        <a class="site-header__logo" href="/">{{ .AppName }}</a>
-        <nav class="nav">
-            {{ template "nav-link" dict "Href" "/" "Text" "Главная" "Path" .Path }}
-            {{ template "nav-link" dict "Href" "/users" "Text" "Пользователи" "Path" .Path }}
-            {{ template "nav-link" dict "Href" "/api/v1/users" "Text" "API" "Path" .Path }}
+        <a class="logo" href="{{ .Links.Home }}" aria-label="{{ .L.T "nav.home" }}">
+            <span class="logo__mark">{{ template "icon" "logo" }}</span>
+            <span class="logo__text">nado</span>
+        </a>
+
+        <nav class="nav" aria-label="{{ .L.T "nav.main" }}">
+            {{ template "nav-links" . }}
         </nav>
+
+        <div class="header-actions">
+            {{ template "lang-switch" . }}
+            {{ template "theme-toggle" . }}
+            <div class="header-actions__auth">
+                {{ if .Principal }}
+                    <a class="btn btn--primary btn--sm" href="{{ .Links.Account }}">{{ template "icon" "user" }}<span>{{ .L.T "nav.account" }}</span></a>
+                {{ else }}
+                    <a class="btn btn--ghost btn--sm" href="{{ .Links.Login }}">{{ .L.T "nav.login" }}</a>
+                    <a class="btn btn--primary btn--sm" href="{{ .Links.Register }}">{{ .L.T "nav.register" }}</a>
+                {{ end }}
+            </div>
+
+            <details class="mobile-nav" data-dropdown>
+                <summary class="icon-btn" aria-label="{{ .L.T "nav.menu" }}">
+                    <span class="mobile-nav__open">{{ template "icon" "menu" }}</span>
+                    <span class="mobile-nav__close">{{ template "icon" "close" }}</span>
+                </summary>
+                <div class="mobile-nav__panel">
+                    <nav class="mobile-nav__links" aria-label="{{ .L.T "nav.main" }}">
+                        {{ template "nav-links" . }}
+                    </nav>
+                    <div class="mobile-nav__auth">
+                        {{ if .Principal }}
+                            <a class="btn btn--primary btn--block" href="{{ .Links.Account }}">{{ .L.T "nav.account" }}</a>
+                        {{ else }}
+                            <a class="btn btn--primary btn--block" href="{{ .Links.Register }}">{{ .L.T "nav.register" }}</a>
+                            <a class="btn btn--ghost btn--block" href="{{ .Links.Login }}">{{ .L.T "nav.login" }}</a>
+                        {{ end }}
+                    </div>
+                </div>
+            </details>
+        </div>
     </div>
 </header>
 {{ end }}
 
-{{/* Вложенный partial: partial-ы могут вызывать друг друга. */}}
-{{ define "nav-link" }}
-<a class="nav__link{{ if eq .Path .Href }} nav__link--active{{ end }}" href="{{ .Href }}">{{ .Text }}</a>
+{{ define "nav-links" }}
+<a class="nav__link" href="{{ .Links.Home }}#features">{{ .L.T "nav.features" }}</a>
+<a class="nav__link" href="{{ .Links.Home }}#how">{{ .L.T "nav.how" }}</a>
+<a class="nav__link" href="{{ .Links.Home }}#pricing">{{ .L.T "nav.pricing" }}</a>
+<a class="nav__link" href="{{ .Links.Home }}#faq">{{ .L.T "nav.faq" }}</a>
+<a class="nav__link" href="{{ .Links.Contact }}">{{ .L.T "nav.contact" }}</a>
+{{ end }}
+
+{{/* Переключатель языка: та же страница на другом языке. */}}
+{{ define "lang-switch" }}
+<details class="dropdown" data-dropdown>
+    <summary class="icon-btn icon-btn--label" aria-label="{{ .L.T "nav.language" }}: {{ .CurrentLang.Name }}">
+        {{ template "icon" "globe" }}<span>{{ .CurrentLang.Short }}</span>
+    </summary>
+    <ul class="dropdown__menu" role="list">
+        {{ range .LangLinks }}
+        <li>
+            <a class="dropdown__item" href="{{ .URL }}" hreflang="{{ .Lang }}" lang="{{ .Lang }}"{{ if .Current }} aria-current="true"{{ end }}>
+                {{ .Name }}{{ if .Current }}{{ template "icon" "check" }}{{ end }}
+            </a>
+        </li>
+        {{ end }}
+    </ul>
+</details>
+{{ end }}
+
+{{/* Переключатель темы: system → light → dark. Логика — static/js/theme.js. */}}
+{{ define "theme-toggle" }}
+{{- $label := .L.T (printf "theme.%s" .Theme.Mode) -}}
+<button type="button" class="icon-btn theme-toggle" data-theme-toggle data-mode="{{ .Theme.Mode }}"
+        data-label-system="{{ .L.T "theme.system" }}" data-label-light="{{ .L.T "theme.light" }}" data-label-dark="{{ .L.T "theme.dark" }}"
+        aria-label="{{ $label }}" title="{{ $label }}">
+    <span class="theme-toggle__icon theme-toggle__icon--system">{{ template "icon" "monitor" }}</span>
+    <span class="theme-toggle__icon theme-toggle__icon--light">{{ template "icon" "sun" }}</span>
+    <span class="theme-toggle__icon theme-toggle__icon--dark">{{ template "icon" "moon" }}</span>
+</button>
 {{ end }}

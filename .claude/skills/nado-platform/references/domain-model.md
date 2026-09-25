@@ -86,6 +86,7 @@
 | `jobs` | Очередь фоновых задач (nado-go-conventions → jobs-queue.md) |
 | `fx_rates` | 🔑(rate_date, base, quote), rate, source (`cbr`/`nbrk`) |
 | `otp_challenges` | 🔑id, store_id, phone_e164, channel, code_hash, provider_request_id, attempts, expires_at, verified_at, ip — одноразовые коды входа (nado-storefront → customer-auth-otp.md) |
+| `feedback_messages` | 🔑id, name, contact, topic, message, lang, status (`new`/`read`/`answered`/`spam`), ip, user_agent, created_at — обращения с формы обратной связи лендинга (миграция 0002) |
 | `webhook_events` | 🔑id, provider_code, dedup_key (unique), received_at, payload, processed_at — дедупликация и аудит входящих вебхуков |
 | `audit_log` | Уже есть в 0001; расширить полем `account_id` |
 

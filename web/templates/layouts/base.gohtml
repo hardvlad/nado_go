@@ -1,31 +1,44 @@
 {{/*
-  Основной каркас страниц.
-  Страница обязана определить блок "content"; блоки "title" и "styles"
-  переопределяются по желанию.
+  Основной каркас страниц сайта nado.
+  Страница определяет блок "content"; "title" переопределяется по желанию.
+
+  Тема (D-21): data-theme ставится только при явном выборе светлой или тёмной
+  темы; в режиме «как в системе» работает media-запрос из tokens.css.
 */}}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ .Lang }}"{{ if eq .Theme.Mode "light" "dark" }} data-theme="{{ .Theme.Mode }}"{{ end }}>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ block "title" . }}{{ .Title }} — {{ .AppName }}{{ end }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
-    {{ block "styles" . }}{{ end }}
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ block "title" . }}{{ .Title }} — nado{{ end }}</title>
+    <meta name="description" content="{{ .Description }}">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="{{ .Theme.LightMedia }}" media="(prefers-color-scheme: light)" data-light="{{ .Theme.Light }}" data-dark="{{ .Theme.Dark }}">
+    <meta name="theme-color" content="{{ .Theme.DarkMedia }}" media="(prefers-color-scheme: dark)" data-light="{{ .Theme.Light }}" data-dark="{{ .Theme.Dark }}">
+    <link rel="canonical" href="{{ .Canonical }}">
+    {{- range .Alternates }}
+    <link rel="alternate" hreflang="{{ .Lang }}" href="{{ .URL }}">
+    {{- end }}
+    <link rel="alternate" hreflang="x-default" href="{{ .XDefault }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="nado">
+    <meta property="og:title" content="{{ .Title }}">
+    <meta property="og:description" content="{{ .Description }}">
+    <link rel="icon" href="/static/img/favicon.svg?v={{ .Version }}" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/css/tokens.css?v={{ .Version }}">
+    <link rel="stylesheet" href="/static/css/app.css?v={{ .Version }}">
+    <script src="/static/js/theme.js?v={{ .Version }}" defer></script>
+    <script src="/static/js/site.js?v={{ .Version }}" defer></script>
 </head>
-<body class="page">
+<body>
+    <a class="skip-link" href="#main">{{ .L.T "nav.skip" }}</a>
+    {{ template "icons" }}
     {{ template "header" . }}
 
-    <main class="container">
-        {{ with .Flash }}
-            {{ template "alert" dict "Kind" .Kind "Text" .Text }}
-        {{ end }}
-
-        {{ block "content" . }}
-            <p>Страница не определила блок content.</p>
-        {{ end }}
+    <main id="main">
+        {{ block "content" . }}{{ end }}
     </main>
 
     {{ template "footer" . }}
-    {{ block "scripts" . }}{{ end }}
 </body>
 </html>

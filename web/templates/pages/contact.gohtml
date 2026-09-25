@@ -1,0 +1,66 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container split">
+        <div class="split__main">
+            <header class="page-head">
+                <p class="eyebrow">{{ .L.T "contact.eyebrow" }}</p>
+                <h1 class="page-head__title">{{ .L.T "contact.heading" }}</h1>
+                <p class="page-head__lead">{{ .L.T "contact.lead" }}</p>
+            </header>
+
+            {{ if .Sent }}
+                {{ template "alert" dict "Kind" "success" "Text" (.L.T "contact.sent") }}
+            {{ end }}
+
+            <form class="form-card" method="post" action="{{ .Links.Contact }}" novalidate>
+                {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+                <div class="form-grid">
+                    {{ template "field" dict "Form" .Form "Name" "name" "Label" (.L.T "form.name") "Type" "text"
+                        "Autocomplete" "name" "Required" true "Max" 150 }}
+                    {{ template "field" dict "Form" .Form "Name" "contact" "Label" (.L.T "form.contact") "Type" "text"
+                        "Autocomplete" "email" "Required" true "Max" 255 "Hint" (.L.T "form.contact_hint") }}
+                </div>
+
+                {{- $topicErr := index .Form.Errors "topic" }}
+                <div class="field{{ if $topicErr }} field--invalid{{ end }}">
+                    <label class="field__label" for="f-topic">{{ .L.T "form.topic" }}</label>
+                    <select class="input" id="f-topic" name="topic" required{{ if $topicErr }} aria-invalid="true" aria-describedby="e-topic"{{ end }}>
+                        {{ range .Topics }}
+                        <option value="{{ .Value }}"{{ if eq .Value (index $.Form.Values "topic") }} selected{{ end }}>{{ .Label }}</option>
+                        {{ end }}
+                    </select>
+                    {{ with $topicErr }}<p class="field__error" id="e-topic">{{ . }}</p>{{ end }}
+                </div>
+
+                {{- $msgErr := index .Form.Errors "message" }}
+                <div class="field{{ if $msgErr }} field--invalid{{ end }}">
+                    <label class="field__label" for="f-message">{{ .L.T "form.message" }}</label>
+                    <textarea class="input input--area" id="f-message" name="message" rows="6" minlength="10" maxlength="4000" required
+                        aria-describedby="{{ if $msgErr }}e-message {{ end }}h-message"{{ if $msgErr }} aria-invalid="true"{{ end }}>{{ index .Form.Values "message" }}</textarea>
+                    <p class="field__hint" id="h-message">{{ .L.T "form.message_hint" }}</p>
+                    {{ with $msgErr }}<p class="field__error" id="e-message">{{ . }}</p>{{ end }}
+                </div>
+
+                {{ template "checkbox" dict "Form" .Form "Name" "consent" "Label" (.L.T "contact.consent") }}
+                {{ template "honeypot" (.L.T "form.honeypot") }}
+
+                <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "contact.submit" }}{{ template "icon" "arrow" }}</button>
+            </form>
+        </div>
+
+        <aside class="split__aside">
+            <div class="aside-card">
+                <span class="card__icon">{{ template "icon" "message" }}</span>
+                <h2 class="aside-card__title">{{ .L.T "contact.aside.title" }}</h2>
+                <ul class="checklist" role="list">
+                    <li>{{ template "icon" "check" }}<span>{{ .L.T "contact.aside.1" }}</span></li>
+                    <li>{{ template "icon" "check" }}<span>{{ .L.T "contact.aside.2" }}</span></li>
+                    <li>{{ template "icon" "check" }}<span>{{ .L.T "contact.aside.3" }}</span></li>
+                    <li>{{ template "icon" "check" }}<span>{{ .L.T "contact.aside.4" }}</span></li>
+                </ul>
+            </div>
+        </aside>
+    </div>
+</section>
+{{ end }}

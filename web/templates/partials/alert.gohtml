@@ -1,5 +1,9 @@
-{{/* Универсальное сообщение. Ожидает dict с ключами Kind и Text:
-     {{ template "alert" dict "Kind" "error" "Text" "Что-то пошло не так" }} */}}
+{{/* Сообщение над формой или на странице. Ожидает dict с ключами Kind и Text:
+     {{ template "alert" dict "Kind" "danger" "Text" .Form.Alert }}
+     Kind: info | success | warning | danger. */}}
 {{ define "alert" }}
-<div class="alert alert--{{ .Kind | default "info" }}" role="status">{{ .Text }}</div>
+<div class="alert alert--{{ .Kind | default "info" }}" role="{{ if eq .Kind "danger" }}alert{{ else }}status{{ end }}">
+    {{ if eq .Kind "success" }}{{ template "icon" "check" }}{{ else }}{{ template "icon" "message" }}{{ end }}
+    <span>{{ .Text }}</span>
+</div>
 {{ end }}

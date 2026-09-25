@@ -1,0 +1,48 @@
+{{/*
+  Поле формы с подписью, подсказкой и ошибкой.
+  {{ template "field" dict "Form" .Form "Name" "email" "Label" (.L.T "form.email")
+      "Type" "email" "Autocomplete" "email" "Required" true "Hint" "" }}
+  Необязательные ключи: Hint, Placeholder, Min, Max, Inputmode, Optional (подпись «необязательно»).
+  Пароль (Type "password") никогда не подставляется обратно в поле.
+*/}}
+{{ define "field" }}
+{{- $err := index .Form.Errors .Name -}}
+<div class="field{{ if $err }} field--invalid{{ end }}">
+    <label class="field__label" for="f-{{ .Name }}">
+        {{ .Label }}{{ if .Optional }} <span class="field__optional">({{ .Optional }})</span>{{ end }}
+    </label>
+    <input class="input" id="f-{{ .Name }}" name="{{ .Name }}" type="{{ .Type | default "text" }}"
+        {{- if ne .Type "password" }} value="{{ index .Form.Values .Name }}"{{ end }}
+        {{- with .Autocomplete }} autocomplete="{{ . }}"{{ end }}
+        {{- with .Placeholder }} placeholder="{{ . }}"{{ end }}
+        {{- with .Inputmode }} inputmode="{{ . }}"{{ end }}
+        {{- with .Min }} minlength="{{ . }}"{{ end }}
+        {{- with .Max }} maxlength="{{ . }}"{{ end }}
+        {{- if .Required }} required{{ end }}
+        {{- if $err }} aria-invalid="true"{{ end }}
+        {{- if or .Hint $err }} aria-describedby="{{ if $err }}e-{{ .Name }}{{ end }}{{ if and .Hint $err }} {{ end }}{{ if .Hint }}h-{{ .Name }}{{ end }}"{{ end }}>
+    {{ with .Hint }}<p class="field__hint" id="h-{{ $.Name }}">{{ . }}</p>{{ end }}
+    {{ with $err }}<p class="field__error" id="e-{{ $.Name }}">{{ . }}</p>{{ end }}
+</div>
+{{ end }}
+
+{{/* Флажок согласия: {{ template "checkbox" dict "Form" .Form "Name" "consent" "Label" "..." }} */}}
+{{ define "checkbox" }}
+{{- $err := index .Form.Errors .Name -}}
+<div class="field field--check{{ if $err }} field--invalid{{ end }}">
+    <label class="check">
+        <input type="checkbox" name="{{ .Name }}" id="f-{{ .Name }}"{{ if index .Form.Checked .Name }} checked{{ end }} required
+            {{- if $err }} aria-invalid="true" aria-describedby="e-{{ .Name }}"{{ end }}>
+        <span>{{ .Label }}</span>
+    </label>
+    {{ with $err }}<p class="field__error" id="e-{{ $.Name }}">{{ . }}</p>{{ end }}
+</div>
+{{ end }}
+
+{{/* Ловушка для ботов: скрыта от людей и программ чтения экрана. */}}
+{{ define "honeypot" }}
+<div class="hp" aria-hidden="true">
+    <label for="f-website">{{ . }}</label>
+    <input type="text" id="f-website" name="website" tabindex="-1" autocomplete="off">
+</div>
+{{ end }}

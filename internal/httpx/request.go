@@ -65,6 +65,61 @@ func Validate(dst any) error {
 	return nil
 }
 
+// FieldError — нарушенное правило проверки поля формы: тег validator
+// ("required", "email", "min"...) или своё правило сервиса ("email_taken").
+// Текст для человека не хранится: его подбирает обработчик на языке страницы.
+type FieldError struct {
+	Tag   string
+	Param string
+}
+
+// CheckFields проверяет структуру по тегам `validate` и возвращает нарушенные
+// правила по полям, либо nil. В отличие от Validate, не формирует русских
+// сообщений — для форм с переводом на несколько языков.
+func CheckFields(dst any) (map[string]FieldError, error) {
+	err := validate().Struct(dst)
+	if err == nil {
+		return nil, nil
+	}
+	var invalid *validator.InvalidValidationError
+	if errors.As(err, &invalid) {
+		return nil, ErrInternal(err)
+	}
+
+	fields := make(map[string]FieldError)
+	var verrs validator.ValidationErrors
+	if errors.As(err, &verrs) {
+		for _, fe := range verrs {
+			fields[jsonFieldName(fe)] = FieldError{Tag: fe.Tag(), Param: fe.Param()}
+		}
+	}
+	return fields, nil
+}
+
+// ErrFields — ошибка валидации формы с правилами по полям.
+func ErrFields(fields map[string]FieldError) *Error {
+	out := make(map[string]any, len(fields))
+	for k, v := range fields {
+		out[k] = v
+	}
+	return ErrValidation("Данные формы не прошли проверку").WithFields(out)
+}
+
+// FieldErrors достаёт правила по полям из ошибки, созданной ErrFields.
+func FieldErrors(err error) (map[string]FieldError, bool) {
+	var appErr *Error
+	if !errors.As(err, &appErr) || appErr.Code != "validation_failed" {
+		return nil, false
+	}
+	out := make(map[string]FieldError, len(appErr.Fields))
+	for k, v := range appErr.Fields {
+		if fe, ok := v.(FieldError); ok {
+			out[k] = fe
+		}
+	}
+	return out, len(out) > 0
+}
+
 func decodeError(err error) error {
 	var syntaxErr *json.SyntaxError
 	var typeErr *json.UnmarshalTypeError

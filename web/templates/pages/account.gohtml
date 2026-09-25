@@ -1,0 +1,33 @@
+{{/* Заготовка кабинета продавца: сам кабинет — следующий этап дорожной карты. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container">
+        <header class="page-head">
+            <h1 class="page-head__title">{{ .Welcome }}</h1>
+        </header>
+
+        <div class="dashboard">
+            <div class="aside-card">
+                <dl class="props">
+                    <dt>{{ .L.T "account.account" }}</dt><dd>{{ .Principal.AccountName }}</dd>
+                    <dt>{{ .L.T "form.email" }}</dt><dd>{{ .Principal.Email }}</dd>
+                    <dt>{{ .L.T "account.plan" }}</dt><dd>{{ .Plan.Name }} · {{ .Plan.Price }} {{ .L.T "pricing.per_month" }}</dd>
+                </dl>
+                <form method="post" action="{{ .Links.Logout }}">
+                    <button class="btn btn--ghost" type="submit">{{ template "icon" "logout" }}{{ .L.T "account.logout" }}</button>
+                </form>
+            </div>
+
+            <div class="aside-card">
+                {{ template "alert" dict "Kind" "info" "Text" (.L.T "account.wip") }}
+                <h2 class="aside-card__title">{{ .L.T "account.next.title" }}</h2>
+                <ol class="checklist checklist--numbered" role="list">
+                    <li>{{ template "icon" "plug" }}<span>{{ .L.T "account.next.1" }}</span></li>
+                    <li>{{ template "icon" "tag" }}<span>{{ .L.T "account.next.2" }}</span></li>
+                    <li>{{ template "icon" "sliders" }}<span>{{ .L.T "account.next.3" }}</span></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</section>
+{{ end }}
