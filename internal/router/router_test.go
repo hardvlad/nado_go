@@ -16,6 +16,7 @@ import (
 	"nado_go/internal/config"
 	"nado_go/internal/database"
 	"nado_go/internal/handler/api"
+	"nado_go/internal/handler/shop"
 	"nado_go/internal/handler/web"
 	"nado_go/internal/i18n"
 	"nado_go/internal/model"
@@ -222,6 +223,9 @@ func newTestEnv(t *testing.T) *testEnv {
 		}),
 		Users:  api.NewUserHandler(users),
 		Health: api.NewHealthHandler("test", map[string]api.Pinger{"database": fakePinger{}}),
+		// Витрина подключена, чтобы покрыть монтирование /shop/* (регрессия на
+		// порядок middleware chi: New не должен паниковать с Shop != nil).
+		Shop: &shop.Handler{},
 	})
 	return &testEnv{srv: srv, feedback: feedbackStore}
 }

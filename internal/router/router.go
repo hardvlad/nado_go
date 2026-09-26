@@ -73,6 +73,13 @@ func New(d Deps) http.Handler {
 		r.Mount("/webhooks/greenapi", d.GreenAPIWebhook.Routes())
 	}
 
+	// Витрина магазина в локальном режиме: /shop/{slug}/... . Отдельный контур:
+	// витрина ставит свои security-заголовки, CSP и защиту форм (Session/CSRF
+	// кабинета ей не нужны). В проде витрина выбирается по Host (hostDispatch ниже).
+	if d.Shop != nil {
+		r.Handle("/shop/*", d.Shop.DevHandler())
+	}
+
 	// NotFound/MethodNotAllowed задаются до Mount: chi передаёт их
 	// вложенным роутерам, у которых нет собственных обработчиков.
 	r.NotFound(d.Pages.NotFound)
@@ -90,12 +97,6 @@ func New(d Deps) http.Handler {
 		cop := http.NewCrossOriginProtection()
 		cop.SetDenyHandler(http.HandlerFunc(d.Pages.Forbidden))
 		r.Use(cop.Handler)
-
-		// Витрина магазина в локальном режиме: /shop/{slug}/... . В проде витрина
-		// выбирается по Host (см. hostDispatch ниже), а не по этому префиксу.
-		if d.Shop != nil {
-			r.Handle("/shop/*", d.Shop.DevHandler())
-		}
 
 		r.Use(d.Pages.Session)
 

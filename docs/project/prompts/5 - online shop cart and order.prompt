@@ -1,2 +1,22 @@
 
 Теперь давай сделаем интернет магазин - главная страница, отображение товаров по категориям, регистрация клиента по телефону, поиск товара, добавление в корзину и оформление заказа
+
+Попытался запустить - получаю следующую ошибку. Проанализируй ее и исправь
+
+panic: chi: all middlewares must be defined before routes on a mux
+goroutine 1 [running]:
+github.com/go-chi/chi/v5.(*Mux).Use(0x10?, {0x2d38e9a82058?, 0x7?, 0x7ff6ee8c8048?})
+C:/Users/User/go/pkg/mod/github.com/go-chi/chi/v5@v5.3.2/mux.go:102 +0x11e
+nado_go/internal/router.New.func1({0x7ff6ee8cf220, 0x2d38e9bdb5c0})
+C:/Projects/nado_go/internal/router/router.go:100 +0x322
+github.com/go-chi/chi/v5.(*Mux).Group(0x10?, 0x2d38e996f7c0)
+C:/Users/User/go/pkg/mod/github.com/go-chi/chi/v5@v5.3.2/mux.go:271 +0x37
+nado_go/internal/router.New({0x2d38e9b00d88, 0x2d38e9b7e7d0, {0x7ff6ee8c7768, 0x2d38e9db4e70}, 0x2d38e9c027e8, 0x2d38e9c40100, 0x2d38e9a18460, 0x2d38e9c03d68, 0x2d38e9c28140, 0x2d38e9c2f200, ...})
+C:/Projects/nado_go/internal/router/router.go:83 +0xc45
+nado_go/internal/app.New({0x7ff6ee8cccd0, 0x2d38e9a10900}, {0x7ff6ee0db65d, 0x3})
+C:/Projects/nado_go/internal/app/app.go:247 +0x22bc
+main.run()
+C:/Projects/nado_go/cmd/nado/main.go:33 +0xba
+main.main()
+C:/Projects/nado_go/cmd/nado/main.go:20 +0x13
+exit status 2
