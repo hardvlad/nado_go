@@ -1,0 +1,21 @@
+{{ define "content" }}
+{{ if .Categories }}
+<h2 class="section-title">{{ .L.T "shop.categories" }}</h2>
+<ul class="chips">
+  {{ range .Categories }}
+  <li><a class="chip" href="{{ $.LangBase }}/c/{{ .Slug }}-{{ .ID }}">{{ .Name }}{{ if .ProductCount }} <small>({{ .ProductCount }})</small>{{ end }}</a></li>
+  {{ end }}
+</ul>
+{{ end }}
+
+<h2 class="section-title">{{ .L.T "shop.latest" }}</h2>
+{{ if .Products }}
+<div class="product-grid">
+  {{ range .Products }}
+    {{ template "product-card" dict "P" . "L" $.L "LangBase" $.LangBase "Lang" $.Lang }}
+  {{ end }}
+</div>
+{{ else }}
+<p class="empty">{{ .L.T "shop.empty_catalog" }}</p>
+{{ end }}
+{{ end }}

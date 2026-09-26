@@ -22,7 +22,18 @@ type Config struct {
 	Messaging Messaging
 	Mailbox   Mailbox
 	Kaspi     Kaspi
+	Platform  Platform
 }
+
+// Platform — хосты платформы для маршрутизации по Host (D-04, D-18).
+type Platform struct {
+	RootHost   string // лендинг: nado.kz
+	AppHost    string // кабинет продавца: app.nado.kz
+	ShopSuffix string // поддомены витрин: <slug>.<ShopSuffix>. Пусто — диспетчеризация по Host выключена (dev: витрина под /shop/{slug})
+}
+
+// HostDispatch — включена ли маршрутизация витрин по Host (задан ShopSuffix).
+func (p Platform) HostDispatch() bool { return p.ShopSuffix != "" }
 
 // Kaspi — параметры кабинетного онбординга Kaspi (D-28).
 type Kaspi struct {
@@ -170,6 +181,11 @@ func Load() (*Config, error) {
 		},
 		Kaspi: Kaspi{
 			EmployeeEmailDomain: env("KASPI_EMPLOYEE_EMAIL_DOMAIN", "kaspi.nado.kz"),
+		},
+		Platform: Platform{
+			RootHost:   strings.ToLower(env("PLATFORM_ROOT_HOST", "")),
+			AppHost:    strings.ToLower(env("PLATFORM_APP_HOST", "")),
+			ShopSuffix: strings.ToLower(strings.TrimPrefix(env("PLATFORM_SHOP_SUFFIX", ""), ".")),
 		},
 	}
 

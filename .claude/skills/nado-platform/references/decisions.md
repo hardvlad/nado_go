@@ -480,3 +480,42 @@ nado-go-conventions (`references/jobs-queue.md`).
 - ⚠️ Порт кабинетных запросов (login/verify/add-email, GraphQL токена) сверен с
   образцом lk_otp_checker.php, но НЕ прогонялся против живого Kaspi — проверить на
   реальном кабинете перед продом (нужен тестовый кабинет, см. открытые вопросы).
+
+## D-30. Витрина магазина: каталог, покупатели, корзина, заказы
+**Дата:** 2026-09-26 · **Источник:** реализация витрины (дорожная карта шаги 5–6)
+
+Решения пользователя по объёму MVP витрины:
+- **Каталог витрины строится полноценной моделью** (products/variants/store_offers/
+  categories + правила цен D-14), а не читается напрямую из зеркала. Источник —
+  marketplace_products, трансформация локальной задачей `catalog.build_store`
+  (миграция 0009). Один товар Kaspi → товар + один вариант + оффер.
+- **Маршрутизация:** префикс `/shop/{slug}` в dev, выбор по Host в проде
+  (`PLATFORM_*`, `store_domains` миграция 0010; поддомен `<slug>.<suffix>`
+  регистрируется при создании магазина). Диспетчер `hostDispatch` в router.
+- **Оформление создаёт заказ** (`orders`/`order_items`, миграция 0012) в статусе
+  `awaiting_payment`, в транзакции с блокировкой офферов (UPDLOCK) и снимком цен;
+  оплата/доставка (шаги 7–9) подключаются позже.
+- **Полная система тем** `web/themes/base` (миграция рендера `internal/theme`,
+  слои base + тема магазина, светлый/тёмный режим D-21, mobile-first, статика под
+  /static, CSP `img-src https:` для фото маркетплейса, `style-src/script-src 'self'`).
+
+Реализация:
+- Цены: `service.pricing` (правило product>category>store, округление; покрыто
+  тестами), `store_price_rules`. Оффер `store_offers` (manual не перезаписывается).
+- Каталог: `CatalogRepository` (build + чтение), `StorefrontService`,
+  `CatalogBuildService` (задача `catalog.build_store`, ставится после ingest).
+- Покупатели (D-17): `customers`/`customer_sessions`/`otp_challenges` (миграция
+  0011), `CustomerAuthService` — вход по телефону, код в WhatsApp через тот же пул
+  GreenAPI, HMAC кода, сессия cookie `nado_cust`, удаление аккаунта (App Store 5.1.1).
+- Корзина: `carts`/`cart_items`, cookie `nado_cart`, состав на сервере, цены
+  пересчитываются из офферов (клиенту не доверяем). `CartService`.
+- Заказы: `OrderService.Checkout` (транзакция, номер по магазину, токен доступа),
+  страница `/order/{number}?t=`, история в кабинете покупателя.
+- Витрина `internal/handler/shop`: home, категория, карточка, поиск (LIKE),
+  корзина, checkout, заказ, вход/кабинет; i18n ru/kk/en (`shop.*`); robots.txt,
+  sitemap.xml, canonical. Тесты httptest на маршрутизацию и рендер страниц.
+- ⚠️ Отложено (осознанно): скачивание медиа к себе (пока внешние URL Kaspi),
+  Telegram-канал OTP (только WhatsApp), JSON-LD (нужен nonce под CSP), свои домены
+  с on-demand TLS, мультивалютность отображения (пока базовая валюта магазина),
+  фильтры по характеристикам, склейка вариантов. Названия категорий = код Kaspi
+  (переименование продавцом — позже). Остаток при «в наличии» без числа = 1.

@@ -1,0 +1,25 @@
+{{ define "content" }}
+<div class="panel panel--narrow">
+  <div class="row-between">
+    <h1>{{ .L.T "shop.account_title" }}</h1>
+    <form method="post" action="{{ .LangBase }}/logout"><button class="btn btn--outline" type="submit">{{ .L.T "shop.logout" }}</button></form>
+  </div>
+  <p class="muted">{{ .Customer.PhoneE164 }}{{ with .Customer.Name }} · {{ . }}{{ end }}</p>
+
+  <h2 class="section-title">{{ .L.T "shop.my_orders" }}</h2>
+  {{ if .Orders }}
+  <ul>
+    {{ range .Orders }}
+    <li><a href="{{ $.LangBase }}/order/{{ .Number }}?t={{ .Token }}">№ {{ .Number }}</a> — {{ money .TotalMinor .Currency $.Lang }}</li>
+    {{ end }}
+  </ul>
+  {{ else }}
+  <p class="muted">{{ .L.T "shop.no_orders" }}</p>
+  {{ end }}
+
+  <hr class="mt-24">
+  <form method="post" action="{{ .LangBase }}/account/delete" class="mt-12">
+    <button class="btn btn--outline" type="submit">{{ .L.T "shop.delete_account" }}</button>
+  </form>
+</div>
+{{ end }}

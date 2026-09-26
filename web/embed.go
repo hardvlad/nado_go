@@ -18,10 +18,14 @@ var templatesFS embed.FS
 //go:embed all:static
 var staticFS embed.FS
 
+//go:embed all:themes
+var themesFS embed.FS
+
 // Пути на диске относительно корня репозитория (режим разработки).
 const (
 	templatesDir = "web/templates"
 	staticDir    = "web/static"
+	themesDir    = "web/themes"
 )
 
 // Templates возвращает файловую систему с шаблонами.
@@ -39,6 +43,14 @@ func Static(fromDisk bool) (fs.FS, error) {
 		return diskFS(staticDir)
 	}
 	return fs.Sub(staticFS, "static")
+}
+
+// Themes возвращает файловую систему тем витрины (корень — подкаталоги по темам).
+func Themes(fromDisk bool) (fs.FS, error) {
+	if fromDisk {
+		return diskFS(themesDir)
+	}
+	return fs.Sub(themesFS, "themes")
 }
 
 // diskFS проверяет существование каталога до создания os.DirFS: иначе

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"nado_go/internal/database"
 	"nado_go/internal/integration/marketplace/kaspi"
+	"nado_go/internal/jobs"
 	"nado_go/internal/model"
 	"nado_go/internal/repository"
 )
@@ -21,10 +23,12 @@ var ErrConnectionNotFound = errors.New("service: подключение не н�
 type KaspiCatalogService struct {
 	stores   *repository.StoreRepository
 	products *repository.MarketplaceProductRepository
+	jobs     *jobs.Repository
+	log      *slog.Logger
 }
 
-func NewKaspiCatalogService(stores *repository.StoreRepository, products *repository.MarketplaceProductRepository) *KaspiCatalogService {
-	return &KaspiCatalogService{stores: stores, products: products}
+func NewKaspiCatalogService(stores *repository.StoreRepository, products *repository.MarketplaceProductRepository, jobsRepo *jobs.Repository, log *slog.Logger) *KaspiCatalogService {
+	return &KaspiCatalogService{stores: stores, products: products, jobs: jobsRepo, log: log}
 }
 
 // Ingest сохраняет страницу товаров подключения. Final=true — конец обхода.
@@ -54,6 +58,18 @@ func (s *KaspiCatalogService) Ingest(ctx context.Context, connectionID int64, re
 	if req.Final {
 		if err := s.stores.TouchContentSync(ctx, connectionID); err != nil {
 			return resp, err
+		}
+		// Зеркало обновлено — перестраиваем продаваемый каталог витрины.
+		if s.jobs != nil {
+			if _, err := s.jobs.Enqueue(ctx, jobs.Enqueue{
+				Kind:      jobs.KindCatalogBuild,
+				Execution: jobs.Local,
+				AccountID: accountID,
+				Payload:   map[string]any{"connection_id": connectionID},
+				DedupKey:  fmt.Sprintf("catalog_build:%d", connectionID),
+			}); err != nil && s.log != nil {
+				s.log.Warn("не удалось поставить сборку каталога", slog.Int64("connection_id", connectionID), slog.Any("error", err))
+			}
 		}
 	}
 	return resp, nil

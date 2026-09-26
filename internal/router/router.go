@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -13,6 +14,7 @@ import (
 	"nado_go/internal/config"
 	"nado_go/internal/handler/api"
 	"nado_go/internal/handler/jobsapi"
+	"nado_go/internal/handler/shop"
 	"nado_go/internal/handler/web"
 	"nado_go/internal/handler/webhook"
 	"nado_go/internal/httpx"
@@ -27,6 +29,7 @@ type Deps struct {
 	Static          fs.FS
 	I18n            *i18n.Bundle
 	Pages           *web.PageHandler
+	Shop            *shop.Handler
 	Users           *api.UserHandler
 	Health          *api.HealthHandler
 	JobsAPI         *jobsapi.Handler
@@ -88,6 +91,12 @@ func New(d Deps) http.Handler {
 		cop.SetDenyHandler(http.HandlerFunc(d.Pages.Forbidden))
 		r.Use(cop.Handler)
 
+		// Витрина магазина в локальном режиме: /shop/{slug}/... . В проде витрина
+		// выбирается по Host (см. hostDispatch ниже), а не по этому префиксу.
+		if d.Shop != nil {
+			r.Handle("/shop/*", d.Shop.DevHandler())
+		}
+
 		r.Use(d.Pages.Session)
 
 		// Одни и те же страницы на каждом языке: /, /kk, /en.
@@ -100,7 +109,53 @@ func New(d Deps) http.Handler {
 		}
 	})
 
+	// В проде витрины обслуживаются по Host: <slug>.<домен> и свои домены.
+	// Диспетчер выбирает дерево до маршрутов платформы.
+	if d.Shop != nil && d.Config.Platform.HostDispatch() {
+		return hostDispatch(d, r)
+	}
 	return r
+}
+
+// hostDispatch направляет запрос по Host: корневой домен и app-домен — на
+// платформу (лендинг и кабинет), инфраструктурные пути — тоже на платформу,
+// остальные хосты (<slug>.<домен> и свои домены) — на витрину.
+func hostDispatch(d Deps, platform http.Handler) http.Handler {
+	shopHost := d.Shop.HostHandler()
+	root := d.Config.Platform.RootHost
+	app := d.Config.Platform.AppHost
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := normalizeHost(r.Host)
+		switch {
+		case host == "" || host == root || host == app:
+			platform.ServeHTTP(w, r)
+		case isPlatformPath(r.URL.Path):
+			platform.ServeHTTP(w, r)
+		default:
+			shopHost.ServeHTTP(w, r)
+		}
+	})
+}
+
+// isPlatformPath — пути, которые обслуживает платформа на любом хосте (пробы,
+// API воркеров, вебхуки, JSON API).
+func isPlatformPath(p string) bool {
+	switch {
+	case p == "/healthz" || p == "/readyz":
+		return true
+	case strings.HasPrefix(p, "/jobs-api/"), strings.HasPrefix(p, "/webhooks/"), strings.HasPrefix(p, "/api/"):
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeHost(host string) string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = host[:i]
+	}
+	return host
 }
 
 // mountAPI монтирует версионированное JSON API.

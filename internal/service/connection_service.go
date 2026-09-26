@@ -32,16 +32,17 @@ const initialOrdersWindow = 30 * 24 * time.Hour
 
 // ConnectionService подключает магазин к маркетплейсу и синхронизирует заказы.
 type ConnectionService struct {
-	stores *repository.StoreRepository
-	orders *repository.MarketplaceOrderRepository
-	box    *secrets.Box
-	kaspi  *kaspi.Official
-	jobs   *jobs.Repository
-	log    *slog.Logger
+	stores     *repository.StoreRepository
+	orders     *repository.MarketplaceOrderRepository
+	box        *secrets.Box
+	kaspi      *kaspi.Official
+	jobs       *jobs.Repository
+	shopSuffix string // домен платформы для поддомена витрины (<slug>.<suffix>)
+	log        *slog.Logger
 }
 
-func NewConnectionService(stores *repository.StoreRepository, orders *repository.MarketplaceOrderRepository, box *secrets.Box, k *kaspi.Official, jobsRepo *jobs.Repository, log *slog.Logger) *ConnectionService {
-	return &ConnectionService{stores: stores, orders: orders, box: box, kaspi: k, jobs: jobsRepo, log: log}
+func NewConnectionService(stores *repository.StoreRepository, orders *repository.MarketplaceOrderRepository, box *secrets.Box, k *kaspi.Official, jobsRepo *jobs.Repository, shopSuffix string, log *slog.Logger) *ConnectionService {
+	return &ConnectionService{stores: stores, orders: orders, box: box, kaspi: k, jobs: jobsRepo, shopSuffix: shopSuffix, log: log}
 }
 
 // ConnectKaspi создаёт магазин с подключением к Kaspi по токену официального
@@ -88,6 +89,7 @@ func (s *ConnectionService) CreateKaspiStoreFromToken(ctx context.Context, accou
 			SecretCiphertext: cipher,
 			PublicMeta:       string(meta),
 			ConnectionName:   storeName,
+			ShopSuffix:       s.shopSuffix,
 		}
 	}
 

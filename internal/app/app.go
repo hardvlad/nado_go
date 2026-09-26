@@ -16,6 +16,7 @@ import (
 	"nado_go/internal/database"
 	"nado_go/internal/handler/api"
 	"nado_go/internal/handler/jobsapi"
+	"nado_go/internal/handler/shop"
 	"nado_go/internal/handler/web"
 	"nado_go/internal/handler/webhook"
 	"nado_go/internal/i18n"
@@ -27,6 +28,7 @@ import (
 	"nado_go/internal/router"
 	"nado_go/internal/secrets"
 	"nado_go/internal/service"
+	"nado_go/internal/theme"
 	"nado_go/internal/view"
 	webassets "nado_go/web"
 )
@@ -129,7 +131,26 @@ func New(ctx context.Context, version string) (*App, error) {
 	jobsRepo := jobs.NewRepository(db)
 	runner := jobs.NewRunner(jobsRepo, log)
 	catalogService := service.NewKaspiCatalogService(
-		repository.NewStoreRepository(db), repository.NewMarketplaceProductRepository(db))
+		repository.NewStoreRepository(db), repository.NewMarketplaceProductRepository(db), jobsRepo, log)
+
+	// Сборка продаваемого каталога витрины из зеркала (marketplace_products →
+	// products/variants/store_offers), локальная задача.
+	catalogBuild := service.NewCatalogBuildService(
+		repository.NewMarketplaceProductRepository(db), repository.NewCatalogRepository(db),
+		repository.NewStoreRepository(db), log)
+	runner.Register(jobs.KindCatalogBuild, func(ctx context.Context, job jobs.Job) (json.RawMessage, error) {
+		var p struct {
+			ConnectionID int64 `json:"connection_id"`
+		}
+		if err := json.Unmarshal(job.Payload, &p); err != nil {
+			return nil, jobs.Permanent(fmt.Errorf("app: payload catalog.build_store: %w", err))
+		}
+		built, err := catalogBuild.Rebuild(ctx, p.ConnectionID)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(map[string]int{"built": built})
+	})
 	// Источник кода MFA для воркера — почтовый ящик служебных сотрудников (IMAP).
 	// Коды кладёт поллер (см. Run), выдаёт репозиторий с учётом срока годности.
 	kaspiMFARepo := repository.NewKaspiMFARepository(db)
@@ -138,7 +159,7 @@ func New(ctx context.Context, version string) (*App, error) {
 	// Подключение магазинов к Kaspi (официальный Shop API) и импорт заказов.
 	connService := service.NewConnectionService(
 		repository.NewStoreRepository(db), repository.NewMarketplaceOrderRepository(db),
-		box, kaspi.NewOfficial(), jobsRepo, log)
+		box, kaspi.NewOfficial(), jobsRepo, cfg.Platform.ShopSuffix, log)
 
 	// Кабинетный онбординг Kaspi: отправка SMS владельцу, создание сотрудника,
 	// приём его пароля из почты, импорт каталога (D-28).
@@ -180,23 +201,56 @@ func New(ctx context.Context, version string) (*App, error) {
 
 	health := api.NewHealthHandler(version, map[string]api.Pinger{"database": db})
 
+	pages := web.NewPageHandler(web.Deps{
+		Render:        renderer,
+		I18n:          bundle,
+		Plans:         plans,
+		Auth:          authService,
+		OTP:           otpService,
+		Connections:   connService,
+		Onboarding:    onboardingService,
+		Feedback:      feedbackService,
+		SecureCookies: cfg.IsProduction(),
+		PublicURL:     cfg.App.PublicURL,
+	})
+
+	// Витрина магазина (публичная часть): темы, каталог, выбор магазина по slug/Host.
+	themesFS, err := webassets.Themes(cfg.App.Debug)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("app: темы витрины: %w", err)
+	}
+	themeRenderer, err := theme.New(themesFS, theme.WithDebug(cfg.App.Debug))
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	// Вход покупателей по телефону (D-17): код в WhatsApp через тот же пул GreenAPI.
+	customerAuth := service.NewCustomerAuthService(
+		repository.NewCustomerRepository(db), box, sender, codeMessage, log)
+
+	cartRepo := repository.NewCartRepository(db)
+	shopHandler := shop.New(shop.Deps{
+		Stores:      repository.NewStoreRepository(db),
+		Catalog:     service.NewStorefrontService(repository.NewCatalogRepository(db)),
+		Customers:   customerAuth,
+		Cart:        service.NewCartService(cartRepo),
+		Orders:      service.NewOrderService(repository.NewOrderRepository(db), cartRepo),
+		Render:      themeRenderer,
+		ThemeStatic: themesFS,
+		I18n:        bundle,
+		NotFound:    pages.NotFound,
+		Prod:        cfg.IsProduction(),
+		Log:         log,
+	})
+
 	handler := router.New(router.Deps{
-		Config: cfg,
-		Logger: log,
-		Static: staticFS,
-		I18n:   bundle,
-		Pages: web.NewPageHandler(web.Deps{
-			Render:        renderer,
-			I18n:          bundle,
-			Plans:         plans,
-			Auth:          authService,
-			OTP:           otpService,
-			Connections:   connService,
-			Onboarding:    onboardingService,
-			Feedback:      feedbackService,
-			SecureCookies: cfg.IsProduction(),
-			PublicURL:     cfg.App.PublicURL,
-		}),
+		Config:          cfg,
+		Logger:          log,
+		Static:          staticFS,
+		I18n:            bundle,
+		Pages:           pages,
+		Shop:            shopHandler,
 		Users:           api.NewUserHandler(userService),
 		Health:          health,
 		JobsAPI:         jobsAPI,

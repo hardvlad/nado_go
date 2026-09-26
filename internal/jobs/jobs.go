@@ -44,6 +44,7 @@ const (
 	KindKaspiImportOrders = "kaspi.import_orders" // remote: импорт заказов
 	KindMediaFetch        = "media.fetch"         // local: скачивание фото
 	KindPricingRecalc     = "pricing.recalc"      // local: пересчёт цен магазина
+	KindCatalogBuild      = "catalog.build_store" // local: сборка витринного каталога из зеркала
 )
 
 // Job — единица работы в очереди.

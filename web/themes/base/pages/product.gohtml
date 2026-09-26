@@ -1,0 +1,39 @@
+{{ define "content" }}
+{{ $p := .Product }}
+<nav class="breadcrumbs"><a href="{{ .LangBase }}/">{{ .L.T "shop.home_title" }}</a> / {{ $p.Title }}</nav>
+<article class="product">
+  <div class="gallery">
+    <div class="gallery__main">
+      {{ if $p.Images }}<img src="{{ index $p.Images 0 }}" alt="{{ $p.Title }}">{{ end }}
+    </div>
+    {{ if gt (len $p.Images) 1 }}
+    <div class="gallery__thumbs">
+      {{ range $p.Images }}<img src="{{ . }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
+    </div>
+    {{ end }}
+  </div>
+
+  <div class="product__info">
+    <h1>{{ $p.Title }}</h1>
+    {{ with $p.Brand }}<p class="muted">{{ $.L.T "shop.brand" }}: {{ . }}</p>{{ end }}
+    <p class="product__price">{{ money $p.PriceMinor $p.Currency .Lang }}{{ if $p.OldPriceMinor }} <span class="card__old">{{ money $p.OldPriceMinor $p.Currency .Lang }}</span>{{ end }}</p>
+
+    {{ if $p.Available }}
+    <form method="post" action="{{ .LangBase }}/cart/add" class="mt-12">
+      <input type="hidden" name="variant_id" value="{{ $p.VariantID }}">
+      <input type="hidden" name="qty" value="1">
+      <button class="btn btn--primary btn--lg" type="submit">{{ .L.T "shop.add_to_cart" }}</button>
+    </form>
+    {{ else }}
+    <p class="card__out mt-12">{{ .L.T "shop.out_of_stock" }}</p>
+    {{ end }}
+
+    {{ with $p.Description }}
+    <div class="product__desc">
+      <h2>{{ $.L.T "shop.description" }}</h2>
+      <p>{{ . }}</p>
+    </div>
+    {{ end }}
+  </div>
+</article>
+{{ end }}

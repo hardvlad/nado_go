@@ -55,6 +55,10 @@ migrate:
 	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0006_marketplace_products.sql
 	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0007_kaspi_mfa_codes.sql
 	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0008_kaspi_onboarding.sql
+	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0009_catalog.sql
+	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0010_store_domains.sql
+	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0011_customers.sql
+	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0012_cart_orders.sql
 
 clean:
 	rm -rf bin

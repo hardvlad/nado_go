@@ -87,3 +87,86 @@ func (r *MarketplaceProductRepository) Upsert(ctx context.Context, p *model.Mark
 	}
 	return created, nil
 }
+
+// SourceProduct — товар зеркала с областью и остатками для построения каталога.
+type SourceProduct struct {
+	StoreID     int64
+	AccountID   int64
+	SKU         string
+	Title       string
+	Brand       string
+	CategoryExt string
+	PriceMinor  int64
+	Currency    string
+	Available   bool
+	ImagesJSON  string
+	Stocks      []model.MarketplaceProductStock
+}
+
+// ListForConnection возвращает все не удалённые товары подключения с остатками —
+// вход для построения витринного каталога (catalog.build_store). Загружает
+// каталог целиком: для MVP приемлемо, при больших объёмах перейти на keyset.
+func (r *MarketplaceProductRepository) ListForConnection(ctx context.Context, connectionID int64) ([]SourceProduct, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT id, store_id, account_id, sku, ISNULL(title, ''), ISNULL(brand, ''),
+		       ISNULL(category_ext, ''), ISNULL(price_minor, 0), currency, available, ISNULL(images, '')
+		FROM dbo.marketplace_products
+		WHERE connection_id = @conn AND removed_at IS NULL
+		ORDER BY id;`
+	rows, err := r.db.QueryContext(ctx, query, sql.Named("conn", connectionID))
+	if err != nil {
+		return nil, fmt.Errorf("repository: товары подключения %d: %w", connectionID, database.MapError(err))
+	}
+	defer rows.Close()
+
+	var (
+		out  []SourceProduct
+		byID = map[int64]int{} // product_id → индекс в out
+	)
+	for rows.Next() {
+		var (
+			id int64
+			p  SourceProduct
+		)
+		if err := rows.Scan(&id, &p.StoreID, &p.AccountID, &p.SKU, &p.Title, &p.Brand,
+			&p.CategoryExt, &p.PriceMinor, &p.Currency, &p.Available, &p.ImagesJSON); err != nil {
+			return nil, fmt.Errorf("repository: чтение товара зеркала: %w", err)
+		}
+		byID[id] = len(out)
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	// Остатки одним запросом по всем точкам подключения.
+	const stockQuery = `
+		SELECT s.product_id, s.store_code, s.qty, s.specified, s.preorder
+		FROM dbo.marketplace_product_stocks s
+		JOIN dbo.marketplace_products p ON p.id = s.product_id
+		WHERE p.connection_id = @conn AND p.removed_at IS NULL;`
+	srows, err := r.db.QueryContext(ctx, stockQuery, sql.Named("conn", connectionID))
+	if err != nil {
+		return nil, fmt.Errorf("repository: остатки подключения %d: %w", connectionID, database.MapError(err))
+	}
+	defer srows.Close()
+	for srows.Next() {
+		var (
+			pid int64
+			st  model.MarketplaceProductStock
+		)
+		if err := srows.Scan(&pid, &st.StoreCode, &st.Qty, &st.Specified, &st.PreOrder); err != nil {
+			return nil, fmt.Errorf("repository: чтение остатка зеркала: %w", err)
+		}
+		if idx, ok := byID[pid]; ok {
+			out[idx].Stocks = append(out[idx].Stocks, st)
+		}
+	}
+	return out, srows.Err()
+}

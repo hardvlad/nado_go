@@ -34,6 +34,9 @@ type NewConnection struct {
 	SecretCiphertext []byte
 	PublicMeta       string // JSON, что можно показать (merchantId, имя кабинета)
 	ConnectionName   string
+	// ShopSuffix — домен платформы для поддомена витрины (<slug>.<suffix>).
+	// Пусто — поддомен не регистрируется (локальная разработка).
+	ShopSuffix string
 }
 
 // CreateStoreWithConnection создаёт магазин, учётные данные и подключение одной
@@ -82,6 +85,19 @@ func (r *StoreRepository) CreateStoreWithConnection(ctx context.Context, in NewC
 			sql.Named("name", nullString(in.ConnectionName)),
 		).Scan(&connectionID); err != nil {
 			return database.MapError(err)
+		}
+
+		// Поддомен витрины <slug>.<suffix> — по нему магазин находится по Host.
+		if in.ShopSuffix != "" {
+			const insertDomain = `
+				INSERT INTO dbo.store_domains (store_id, host, kind, is_primary)
+				VALUES (@store_id, @host, 'subdomain', 1);`
+			if _, err := tx.ExecContext(ctx, insertDomain,
+				sql.Named("store_id", storeID),
+				sql.Named("host", in.Slug+"."+in.ShopSuffix),
+			); err != nil {
+				return database.MapError(err)
+			}
 		}
 		return nil
 	})
@@ -178,6 +194,58 @@ func (r *StoreRepository) MarkConnectionInvalid(ctx context.Context, connectionI
 		return fmt.Errorf("repository: пометка подключения %d invalid: %w", connectionID, database.MapError(err))
 	}
 	return nil
+}
+
+// storefrontColumns — общий список колонок для разрешения витрины.
+const storefrontColumns = `s.id, s.account_id, s.slug, s.name, s.status, s.default_lang, s.base_currency,
+	s.theme_code, ISNULL(s.theme_settings, ''),
+	ISNULL((SELECT TOP 1 host FROM dbo.store_domains d WHERE d.store_id = s.id AND d.is_primary = 1 ORDER BY d.id), '')`
+
+func scanStorefront(row interface{ Scan(...any) error }) (*model.StorefrontStore, error) {
+	var s model.StorefrontStore
+	err := row.Scan(&s.ID, &s.AccountID, &s.Slug, &s.Name, &s.Status, &s.DefaultLang, &s.BaseCurrency,
+		&s.ThemeCode, &s.ThemeSettings, &s.PrimaryHost)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository: разрешение магазина: %w", database.MapError(err))
+	}
+	return &s, nil
+}
+
+// ResolveBySlug находит магазин витрины по slug (локальная разработка, /shop/{slug}).
+func (r *StoreRepository) ResolveBySlug(ctx context.Context, slug string) (*model.StorefrontStore, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `SELECT ` + storefrontColumns + ` FROM dbo.stores s WHERE s.slug = @slug;`
+	return scanStorefront(r.db.QueryRowContext(ctx, query, sql.Named("slug", slug)))
+}
+
+// ResolveByHost находит магазин витрины по домену (прод, выбор по Host).
+func (r *StoreRepository) ResolveByHost(ctx context.Context, host string) (*model.StorefrontStore, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `SELECT ` + storefrontColumns + `
+		FROM dbo.store_domains d JOIN dbo.stores s ON s.id = d.store_id
+		WHERE d.host = @host;`
+	return scanStorefront(r.db.QueryRowContext(ctx, query, sql.Named("host", host)))
+}
+
+// StoreLocale возвращает язык по умолчанию и базовую валюту магазина.
+func (r *StoreRepository) StoreLocale(ctx context.Context, storeID int64) (lang, currency string, err error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `SELECT default_lang, base_currency FROM dbo.stores WHERE id = @id;`
+	err = r.db.QueryRowContext(ctx, query, sql.Named("id", storeID)).Scan(&lang, &currency)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", database.ErrNotFound
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("repository: локаль магазина %d: %w", storeID, database.MapError(err))
+	}
+	return lang, currency, nil
 }
 
 // ListStores возвращает магазины аккаунта с их подключением (для кабинета).

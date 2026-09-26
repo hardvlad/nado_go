@@ -1,0 +1,35 @@
+{{ define "content" }}
+<div class="panel panel--narrow">
+  <h1>{{ .L.T "shop.login_title" }}</h1>
+  <p class="field__hint">{{ .L.T "shop.login_lead" }}</p>
+  {{ with .Error }}<div class="alert alert--danger">{{ . }}</div>{{ end }}
+
+  {{ if eq .Step "code" }}
+    <p>{{ .L.T "shop.code_sent" "Phone" .Phone }}</p>
+    <form method="post" action="{{ .LangBase }}/login/verify" novalidate>
+      <input type="hidden" name="phone" value="{{ .Phone }}">
+      {{ with .Next }}<input type="hidden" name="next" value="{{ . }}">{{ end }}
+      <div class="field">
+        <label for="code">{{ .L.T "shop.code" }}</label>
+        <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      </div>
+      <div class="field">
+        <label for="name">{{ .L.T "shop.name" }}</label>
+        <input id="name" name="name" value="{{ .Name }}" autocomplete="name" maxlength="150">
+      </div>
+      <button class="btn btn--primary btn--block" type="submit">{{ .L.T "shop.enter" }}</button>
+    </form>
+    <p class="mt-12"><a href="{{ .LangBase }}/login">{{ .L.T "shop.change_phone" }}</a></p>
+  {{ else }}
+    <form method="post" action="{{ .LangBase }}/login" novalidate>
+      {{ with .Next }}<input type="hidden" name="next" value="{{ . }}">{{ end }}
+      <div class="field">
+        <label for="phone">{{ .L.T "shop.phone" }}</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="{{ .L.T `shop.phone_hint` }}" required>
+      </div>
+      <button class="btn btn--primary btn--block" type="submit">{{ .L.T "shop.get_code" }}</button>
+      <p class="field__hint mt-12">{{ .L.T "shop.consent" }}</p>
+    </form>
+  {{ end }}
+</div>
+{{ end }}

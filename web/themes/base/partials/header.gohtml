@@ -1,0 +1,17 @@
+{{ define "header" }}
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="site-header__logo" href="{{ .LangBase }}/">{{ .Store.Name }}</a>
+    <form class="search-form" method="get" action="{{ .LangBase }}/search" role="search">
+      <input type="search" name="q" value="{{ .Query }}" placeholder="{{ .L.T `shop.search_placeholder` }}" aria-label="{{ .L.T `shop.search` }}">
+      <button type="submit" aria-label="{{ .L.T `shop.search` }}">{{ .L.T "shop.search_go" }}</button>
+    </form>
+    <div class="site-header__spacer"></div>
+    <div class="header-actions">
+      <button class="icon-btn" data-theme-toggle data-theme-mode="{{ .ThemeMode }}" type="button" aria-label="{{ .L.T `shop.theme` }}">◐</button>
+      <a class="icon-btn" href="{{ .LangBase }}/account" aria-label="{{ .L.T `shop.account` }}">{{ if .Customer }}●{{ else }}○{{ end }}</a>
+      <a class="icon-btn cart-link" href="{{ .LangBase }}/cart" aria-label="{{ .L.T `shop.cart` }}">🛒{{ if .CartCount }}<span class="cart-badge">{{ .CartCount }}</span>{{ end }}</a>
+    </div>
+  </div>
+</header>
+{{ end }}

@@ -1,0 +1,14 @@
+{{/* Карточка товара в сетке. Ожидает dict: "P" (товар), "L", "LangBase", "Lang". */}}
+{{ define "product-card" }}
+{{ $p := .P }}
+<a class="card" href="{{ .LangBase }}/p/{{ $p.Slug }}-{{ $p.ID }}">
+  <div class="card__media">
+    {{ if $p.Images }}<img src="{{ index $p.Images 0 }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
+  </div>
+  <div class="card__body">
+    <span class="card__title">{{ $p.Title }}</span>
+    <span class="card__price">{{ money $p.PriceMinor $p.Currency .Lang }}{{ if $p.OldPriceMinor }}<span class="card__old">{{ money $p.OldPriceMinor $p.Currency .Lang }}</span>{{ end }}</span>
+    {{ if not $p.Available }}<span class="card__out">{{ .L.T "shop.out_of_stock" }}</span>{{ end }}
+  </div>
+</a>
+{{ end }}

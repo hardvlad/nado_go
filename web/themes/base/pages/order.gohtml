@@ -1,0 +1,23 @@
+{{ define "content" }}
+{{ $o := .Order }}
+<div class="panel panel--narrow">
+  <div class="alert alert--success">{{ .L.T "shop.order_created" }}</div>
+  <h1>{{ .L.T "shop.order_number" }} {{ $o.Number }}</h1>
+  <p class="muted">{{ .L.T "shop.order_status" }}: {{ .L.T (printf "shop.status_%s" $o.Status) }}</p>
+
+  <h2 class="section-title">{{ .L.T "shop.order_items" }}</h2>
+  {{ range $o.Items }}
+  <div class="row-between mt-12">
+    <span>{{ .Title }} × {{ .Qty }}</span>
+    <span>{{ money .LineMinor $o.Currency $.Lang }}</span>
+  </div>
+  {{ end }}
+  <div class="cart-total">
+    <span>{{ .L.T "shop.order_total" }}</span>
+    <span>{{ money $o.TotalMinor $o.Currency .Lang }}</span>
+  </div>
+
+  <p class="muted">{{ .L.T "shop.pay_later_note" }}</p>
+  <p class="mt-12"><a class="btn btn--outline" href="{{ .LangBase }}/">{{ .L.T "shop.continue_shopping" }}</a></p>
+</div>
+{{ end }}

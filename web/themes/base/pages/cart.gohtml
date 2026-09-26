@@ -1,0 +1,39 @@
+{{ define "content" }}
+<h1 class="section-title">{{ .L.T "shop.cart_title" }}</h1>
+{{ if .Cart.Lines }}
+<div class="panel">
+  {{ range .Cart.Lines }}
+  <div class="cart-row">
+    <a class="cart-row__media" href="{{ $.LangBase }}/p/{{ .Slug }}-{{ .ProductID }}">
+      {{ if .Image }}<img src="{{ .Image }}" alt="{{ .Title }}">{{ end }}
+    </a>
+    <div>
+      <a href="{{ $.LangBase }}/p/{{ .Slug }}-{{ .ProductID }}">{{ .Title }}</a>
+      <div class="muted">{{ money .PriceMinor .Currency $.Lang }}{{ if not .InStock }} · {{ $.L.T "shop.out_of_stock" }}{{ end }}</div>
+      <form method="post" action="{{ $.LangBase }}/cart/update" class="row-between mt-12">
+        <input type="hidden" name="variant_id" value="{{ .VariantID }}">
+        <input class="qty-input" type="number" name="qty" value="{{ .Qty }}" min="0" max="99" aria-label="{{ $.L.T `shop.qty` }}">
+        <button class="btn btn--outline btn--sm" type="submit">{{ $.L.T "shop.update" }}</button>
+      </form>
+    </div>
+    <div>
+      <div class="card__price">{{ money .LineMinor .Currency $.Lang }}</div>
+      <form method="post" action="{{ $.LangBase }}/cart/remove">
+        <input type="hidden" name="variant_id" value="{{ .VariantID }}">
+        <button class="btn btn--outline btn--sm" type="submit">{{ $.L.T "shop.remove" }}</button>
+      </form>
+    </div>
+  </div>
+  {{ end }}
+
+  <div class="cart-total">
+    <span>{{ .L.T "shop.cart_total" }}</span>
+    <span>{{ money .Cart.TotalMinor .Cart.Currency .Lang }}</span>
+  </div>
+  <a class="btn btn--primary btn--lg btn--block" href="{{ .LangBase }}/checkout">{{ .L.T "shop.checkout" }}</a>
+</div>
+{{ else }}
+<p class="empty">{{ .L.T "shop.cart_empty" }}</p>
+<p class="empty"><a class="btn btn--primary" href="{{ .LangBase }}/">{{ .L.T "shop.continue_shopping" }}</a></p>
+{{ end }}
+{{ end }}

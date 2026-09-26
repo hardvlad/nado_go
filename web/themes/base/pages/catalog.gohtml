@@ -1,0 +1,25 @@
+{{ define "content" }}
+<h1 class="section-title">{{ .Heading }}</h1>
+{{ if .Query }}<p class="muted">{{ .L.T "shop.products_count" "Count" .Total }}</p>{{ end }}
+
+{{ if .Products }}
+<div class="product-grid">
+  {{ range .Products }}
+    {{ template "product-card" dict "P" . "L" $.L "LangBase" $.LangBase "Lang" $.Lang }}
+  {{ end }}
+</div>
+
+{{ if gt .TotalPages 1 }}
+<nav class="pagination">
+  {{ range .PageNums }}
+    {{ if eq . $.Page }}<span class="is-current">{{ . }}</span>{{ else }}<a href="{{ $.PageBase }}{{ . }}">{{ . }}</a>{{ end }}
+  {{ end }}
+</nav>
+{{ end }}
+
+{{ else if .Query }}
+<p class="empty">{{ .L.T "shop.nothing_found" "Query" .Query }}</p>
+{{ else }}
+<p class="empty">{{ .L.T "shop.empty_catalog" }}</p>
+{{ end }}
+{{ end }}

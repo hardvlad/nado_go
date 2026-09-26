@@ -1,0 +1,45 @@
+{{ define "content" }}
+<h1 class="section-title">{{ .L.T "shop.checkout_title" }}</h1>
+{{ with .Error }}<div class="alert alert--danger">{{ . }}</div>{{ end }}
+<div class="product">
+  <form method="post" action="{{ .LangBase }}/checkout" class="panel" novalidate>
+    <h2>{{ .L.T "shop.contacts" }}</h2>
+    <div class="field">
+      <label for="name">{{ .L.T "shop.name" }}</label>
+      <input id="name" name="name" value="{{ .Customer.Name }}" autocomplete="name" maxlength="150">
+    </div>
+    <div class="field">
+      <label>{{ .L.T "shop.phone" }}</label>
+      <input value="{{ .Customer.PhoneE164 }}" readonly>
+    </div>
+    <div class="field">
+      <label for="email">{{ .L.T "shop.email_optional" }}</label>
+      <input id="email" name="email" type="email" autocomplete="email" maxlength="200">
+    </div>
+    <h2>{{ .L.T "shop.delivery_address" }}</h2>
+    <div class="field">
+      <textarea id="address" name="address" rows="3" maxlength="500"></textarea>
+    </div>
+    <div class="field">
+      <label for="comment">{{ .L.T "shop.comment" }}</label>
+      <textarea id="comment" name="comment" rows="2" maxlength="1000"></textarea>
+    </div>
+    <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "shop.place_order" }}</button>
+  </form>
+
+  <aside class="panel">
+    <h2>{{ .L.T "shop.order_items" }}</h2>
+    {{ range .Cart.Lines }}
+    <div class="row-between mt-12">
+      <span>{{ .Title }} × {{ .Qty }}</span>
+      <span>{{ money .LineMinor .Currency $.Lang }}</span>
+    </div>
+    {{ end }}
+    <div class="cart-total">
+      <span>{{ .L.T "shop.order_total" }}</span>
+      <span>{{ money .Cart.TotalMinor .Cart.Currency .Lang }}</span>
+    </div>
+    <p class="muted">{{ .L.T "shop.pay_later_note" }}</p>
+  </aside>
+</div>
+{{ end }}
