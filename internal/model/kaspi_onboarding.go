@@ -9,8 +9,9 @@ const (
 	OnboardingOTPSent       = "otp_sent"         // код отправлен, ждём ввода продавцом
 	OnboardingVerifying     = "verifying"        // код отправлен на проверку (создание сотрудника)
 	OnboardingNeedMerchant  = "need_merchant"    // у владельца несколько кабинетов — нужен выбор
-	OnboardingEmployeeMade  = "employee_created" // сотрудник создан, магазин подключён, ждём письмо с паролем
-	OnboardingCatalogQueued = "catalog_queued"   // пароль получен, поставлен импорт каталога
+	OnboardingEmployeeMade  = "employee_created" // сотрудник создан, токен получен, ждём письмо с паролем
+	OnboardingReady         = "ready"            // все данные собраны, показываем форму на подтверждение
+	OnboardingCatalogQueued = "catalog_queued"   // продавец сохранил магазин, поставлен импорт каталога
 	OnboardingDone          = "done"             // каталог импортирован
 	OnboardingFailed        = "failed"           // ошибка на одном из шагов
 )

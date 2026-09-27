@@ -764,6 +764,8 @@ select.input { appearance: auto; }
 .store-card__slug { color: var(--color-text-muted); font-size: 14px; margin-top: 2px; }
 .store-card__conn { margin-top: 10px; font-weight: 600; font-size: 14px; }
 .store-card__sync { margin-top: 4px; }
+.store-card__trial { margin-top: 6px; font-size: 14px; color: var(--color-text-muted); }
+.store-card__actions { margin-top: 12px; font-size: 14px; }
 
 .badge--active { background: var(--color-success-bg); color: var(--color-success); }
 .badge--muted { background: var(--color-surface-2); color: var(--color-text-muted); }

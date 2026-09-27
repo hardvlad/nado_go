@@ -60,6 +60,7 @@ migrate:
 	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0011_customers.sql
 	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0012_cart_orders.sql
 	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0013_trial.sql
+	sqlcmd -S $(DB_HOST) -d $(DB_NAME) -U $(DB_USER) -P $(DB_PASSWORD) -C -i migrations/0014_store_cabinet_creds.sql
 
 clean:
 	rm -rf bin

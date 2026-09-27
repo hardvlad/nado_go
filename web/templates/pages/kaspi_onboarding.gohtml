@@ -1,6 +1,6 @@
 {{ define "head_extra" }}
     {{/* Пока идёт фоновый шаг — обновляем страницу, чтобы показать следующий экран. */}}
-    {{ if or (eq .Onb.Status "started") (eq .Onb.Status "verifying") (eq .Onb.Status "employee_created") (eq .Onb.Status "catalog_queued") }}
+    {{ if or (eq .Onb.Status "started") (eq .Onb.Status "verifying") (eq .Onb.Status "employee_created") }}
     <meta http-equiv="refresh" content="5">
     {{ end }}
 {{ end }}
@@ -46,7 +46,35 @@
                     <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "stores.merchant_submit" }}</button>
                 </form>
 
-            {{ else if or (eq .Onb.Status "employee_created") (eq .Onb.Status "catalog_queued") }}
+            {{ else if eq .Onb.Status "employee_created" }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_gathering" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_gathering_hint" }}</p>
+
+            {{ else if eq .Onb.Status "ready" }}
+                <h2 class="form-card__title">{{ .L.T "stores.st_review" }}</h2>
+                <p class="form-card__hint">{{ .L.T "stores.st_review_hint" }}</p>
+                <form method="post" action="{{ .Links.KaspiCabinet }}/{{ .Onb.ID }}/save" novalidate>
+                    <div class="field">
+                        <label class="field__label" for="f-name">{{ .L.T "stores.name_label" }}</label>
+                        <input class="input" id="f-name" name="name" value="{{ .Review.StoreName }}" required maxlength="200">
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="f-email">{{ .L.T "stores.lk_email" }}</label>
+                        <input class="input" id="f-email" name="email" type="email" value="{{ .Review.Email }}" required maxlength="320">
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="f-password">{{ .L.T "stores.lk_password" }}</label>
+                        <input class="input" id="f-password" name="password" value="{{ .Review.Password }}" required maxlength="200">
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="f-token">{{ .L.T "stores.token_label" }}</label>
+                        <input class="input" id="f-token" name="token" value="{{ .Review.Token }}" required maxlength="400">
+                        <p class="field__hint">{{ .L.T "stores.token_hint" }}</p>
+                    </div>
+                    <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "stores.save_submit" }}</button>
+                </form>
+
+            {{ else if eq .Onb.Status "catalog_queued" }}
                 <h2 class="form-card__title">{{ .L.T "stores.st_importing" }}</h2>
                 <p class="form-card__hint">{{ .L.T "stores.st_importing_hint" }}</p>
                 <p class="form-card__footer"><a href="{{ .Links.Account }}">{{ .L.T "stores.go_account" }}</a></p>

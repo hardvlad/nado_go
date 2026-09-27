@@ -21,6 +21,25 @@ type Store struct {
 	Marketplace      string // код подключённого маркетплейса или ""
 	ConnectionStatus string // active | invalid | paused | ""
 	OrdersSyncAt     time.Time
+	TrialEndsAt      time.Time // конец пробного периода (нулевое — без пробного)
+}
+
+// TrialDaysLeft — сколько полных дней осталось до конца пробного периода
+// (0, если период истёк или не задан).
+func (s Store) TrialDaysLeft() int {
+	if s.TrialEndsAt.IsZero() {
+		return 0
+	}
+	d := time.Until(s.TrialEndsAt)
+	if d <= 0 {
+		return 0
+	}
+	return int((d + 24*time.Hour - time.Nanosecond) / (24 * time.Hour)) // ceil в днях
+}
+
+// TrialActive — пробный период задан и ещё не истёк.
+func (s Store) TrialActive() bool {
+	return !s.TrialEndsAt.IsZero() && time.Now().Before(s.TrialEndsAt)
 }
 
 // StorefrontStore — магазин, разрешённый для витрины по Host или slug.

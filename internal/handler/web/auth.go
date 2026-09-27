@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"nado_go/internal/httpx"
@@ -295,19 +296,41 @@ func (h *PageHandler) Account(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Магазины продавца (D-23): у каждого своё подключение к маркетплейсу.
-	var stores []model.Store
+	var cards []StoreCard
 	if h.Connections != nil {
-		var err error
-		stores, err = h.Connections.Stores(r.Context(), p.AccountID)
+		stores, err := h.Connections.Stores(r.Context(), p.AccountID)
 		if err != nil {
 			return err
+		}
+		for _, s := range stores {
+			cards = append(cards, StoreCard{
+				Store:   s,
+				URL:     h.storeURL(s.Slug),
+				EditURL: i18n.Localize(l.Lang(), "/stores/"+strconv.FormatInt(s.ID, 10)+"/edit"),
+			})
 		}
 	}
 
 	data := h.page(r, "account.title").
 		With("Plan", plan).
 		With("Welcome", l.T("account.welcome", "Name", p.UserName)).
-		With("Stores", stores).
-		With("Connected", r.URL.Query().Get("connected") == "1")
+		With("Stores", cards).
+		With("Connected", r.URL.Query().Get("connected") == "1").
+		With("Saved", r.URL.Query().Get("saved") == "1")
 	return h.Render.Render(w, http.StatusOK, "account", data)
+}
+
+// StoreCard — магазин с готовыми ссылками для кабинета.
+type StoreCard struct {
+	model.Store
+	URL     string // адрес витрины (кликабельная ссылка)
+	EditURL string // адрес формы редактирования
+}
+
+// storeURL строит адрес витрины: в проде поддомен, локально — префикс /shop/{slug}.
+func (h *PageHandler) storeURL(slug string) string {
+	if h.ShopSuffix != "" {
+		return "https://" + slug + "." + h.ShopSuffix
+	}
+	return h.PublicURL + "/shop/" + slug
 }

@@ -39,6 +39,11 @@ type NewConnection struct {
 	ShopSuffix string
 	// TrialDays — бесплатный пробный период магазина в днях (0 — без пробного).
 	TrialDays int
+	// Реквизиты кабинета для повторной проверки и редактирования (кабинетное
+	// подключение): логин (e-mail сотрудника), зашифрованный пароль, uid кабинета.
+	CabinetLogin          string
+	CabinetPasswordCipher []byte
+	MerchantUID           string
 }
 
 // CreateStoreWithConnection создаёт магазин, учётные данные и подключение одной
@@ -78,15 +83,18 @@ func (r *StoreRepository) CreateStoreWithConnection(ctx context.Context, in NewC
 		}
 
 		const insertConn = `
-			INSERT INTO dbo.marketplace_connections (store_id, account_id, marketplace, credentials_id, name)
+			INSERT INTO dbo.marketplace_connections (store_id, account_id, marketplace, credentials_id, name, cabinet_login, cabinet_password_ciphertext, merchant_uid)
 			OUTPUT INSERTED.id
-			VALUES (@store_id, @account_id, @marketplace, @credentials_id, @name);`
+			VALUES (@store_id, @account_id, @marketplace, @credentials_id, @name, @cab_login, @cab_pass, @merchant_uid);`
 		if err := tx.QueryRowContext(ctx, insertConn,
 			sql.Named("store_id", storeID),
 			sql.Named("account_id", in.AccountID),
 			sql.Named("marketplace", in.Marketplace),
 			sql.Named("credentials_id", credID),
 			sql.Named("name", nullString(in.ConnectionName)),
+			sql.Named("cab_login", nullString(in.CabinetLogin)),
+			sql.Named("cab_pass", nullBytes(in.CabinetPasswordCipher)),
+			sql.Named("merchant_uid", nullString(in.MerchantUID)),
 		).Scan(&connectionID); err != nil {
 			return database.MapError(err)
 		}
@@ -331,7 +339,7 @@ func (r *StoreRepository) ListStores(ctx context.Context, accountID int64) ([]mo
 
 	const query = `
 		SELECT s.id, s.name, s.slug, s.status, s.base_currency,
-		       ISNULL(c.marketplace, ''), ISNULL(c.status, ''), c.orders_sync_at
+		       ISNULL(c.marketplace, ''), ISNULL(c.status, ''), c.orders_sync_at, s.trial_ends_at
 		FROM dbo.stores s
 		LEFT JOIN dbo.marketplace_connections c ON c.store_id = s.id
 		WHERE s.account_id = @account_id AND s.status <> 'archived'
@@ -345,15 +353,100 @@ func (r *StoreRepository) ListStores(ctx context.Context, accountID int64) ([]mo
 	var out []model.Store
 	for rows.Next() {
 		var (
-			s      model.Store
-			syncAt sql.NullTime
+			s       model.Store
+			syncAt  sql.NullTime
+			trialAt sql.NullTime
 		)
 		if err := rows.Scan(&s.ID, &s.Name, &s.Slug, &s.Status, &s.BaseCurrency,
-			&s.Marketplace, &s.ConnectionStatus, &syncAt); err != nil {
+			&s.Marketplace, &s.ConnectionStatus, &syncAt, &trialAt); err != nil {
 			return nil, fmt.Errorf("repository: чтение магазина: %w", err)
 		}
 		s.OrdersSyncAt = syncAt.Time
+		s.TrialEndsAt = trialAt.Time
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+// StoreForEdit — данные магазина для формы редактирования (кабинетное подключение).
+type StoreForEdit struct {
+	StoreID          int64
+	AccountID        int64
+	ConnectionID     int64
+	CredentialsID    int64
+	Name             string
+	SecretCiphertext []byte // токен API (зашифрован)
+	CabinetLogin     string
+	MerchantUID      string
+}
+
+// GetStoreForEdit возвращает магазин аккаунта с реквизитами подключения для
+// редактирования. Нет/чужой — database.ErrNotFound.
+func (r *StoreRepository) GetStoreForEdit(ctx context.Context, accountID, storeID int64) (*StoreForEdit, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `
+		SELECT s.id, s.account_id, c.id, c.credentials_id, s.name, pc.secret_ciphertext,
+		       ISNULL(c.cabinet_login, ''), ISNULL(c.merchant_uid, '')
+		FROM dbo.stores s
+		JOIN dbo.marketplace_connections c ON c.store_id = s.id
+		JOIN dbo.provider_credentials pc ON pc.id = c.credentials_id
+		WHERE s.id = @id AND s.account_id = @acc AND s.status <> 'archived';`
+	var e StoreForEdit
+	err := r.db.QueryRowContext(ctx, query, sql.Named("id", storeID), sql.Named("acc", accountID)).
+		Scan(&e.StoreID, &e.AccountID, &e.ConnectionID, &e.CredentialsID, &e.Name, &e.SecretCiphertext,
+			&e.CabinetLogin, &e.MerchantUID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository: магазин %d для редактирования: %w", storeID, database.MapError(err))
+	}
+	return &e, nil
+}
+
+// UpdateStoreForEdit — обновление магазина при редактировании (проверено сервисом).
+type UpdateStoreForEdit struct {
+	StoreID       int64
+	ConnectionID  int64
+	CredentialsID int64
+	Name          string
+	TokenCipher   []byte // новый токен API (зашифрован)
+	CabinetLogin  string
+	// CabinetPasswordCipher — новый пароль (nil — не менять).
+	CabinetPasswordCipher []byte
+	MerchantUID           string
+}
+
+// UpdateStore обновляет имя магазина, токен и реквизиты кабинета одной транзакцией.
+func (r *StoreRepository) UpdateStore(ctx context.Context, in UpdateStoreForEdit) error {
+	return r.db.WithTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE dbo.stores SET name = @name, updated_at = SYSUTCDATETIME() WHERE id = @id;`,
+			sql.Named("name", in.Name), sql.Named("id", in.StoreID)); err != nil {
+			return database.MapError(err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE dbo.provider_credentials SET secret_ciphertext = @secret, last_verified_at = SYSUTCDATETIME() WHERE id = @cid;`,
+			sql.Named("secret", in.TokenCipher), sql.Named("cid", in.CredentialsID)); err != nil {
+			return database.MapError(err)
+		}
+		// Пароль кабинета меняем только если задан новый.
+		if len(in.CabinetPasswordCipher) > 0 {
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE dbo.marketplace_connections SET cabinet_login = @login, cabinet_password_ciphertext = @pass, merchant_uid = @m, status = 'active' WHERE id = @conn;`,
+				sql.Named("login", nullString(in.CabinetLogin)), sql.Named("pass", nullBytes(in.CabinetPasswordCipher)),
+				sql.Named("m", nullString(in.MerchantUID)), sql.Named("conn", in.ConnectionID)); err != nil {
+				return database.MapError(err)
+			}
+		} else {
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE dbo.marketplace_connections SET cabinet_login = @login, merchant_uid = @m, status = 'active' WHERE id = @conn;`,
+				sql.Named("login", nullString(in.CabinetLogin)), sql.Named("m", nullString(in.MerchantUID)),
+				sql.Named("conn", in.ConnectionID)); err != nil {
+				return database.MapError(err)
+			}
+		}
+		return nil
+	})
 }

@@ -187,28 +187,24 @@ func (s *KaspiOnboardingService) SaveMerchants(ctx context.Context, id int64, se
 	return s.repo.SaveMerchants(ctx, id, cipher, string(mj))
 }
 
-// CompleteEmployee фиксирует созданного сотрудника: создаёт магазин с подключением
-// по полученному из кабинета токену и переводит онбординг в ожидание пароля.
-// Вызывается из jobs-API.
+// CompleteEmployee сохраняет полученный из кабинета токен API и uid кабинета.
+// Магазин пока НЕ создаётся — данные собираются в форму (флоу как в PHP);
+// онбординг переходит в ожидание пароля сотрудника из письма. Из jobs-API.
 func (s *KaspiOnboardingService) CompleteEmployee(ctx context.Context, id int64, merchantID, apiToken string) error {
-	accountID, storeName, err := s.repo.Scope(ctx, id)
-	if err != nil {
-		return httpx.ErrInternal(err)
-	}
 	if strings.TrimSpace(apiToken) == "" {
 		return jobs.Permanent(fmt.Errorf("service: кабинет не вернул токен API"))
 	}
-	storeID, connID, err := s.conn.CreateKaspiStoreFromToken(ctx, accountID, storeName, apiToken)
+	cipher, err := s.box.EncryptString(apiToken)
 	if err != nil {
-		return err
+		return httpx.ErrInternal(err)
 	}
-	return s.repo.CompleteEmployee(ctx, id, merchantID, storeID, connID)
+	return s.repo.SetEmployeeToken(ctx, id, merchantID, cipher)
 }
 
 // SetEmployeePassword принимает пароль служебного сотрудника из почты: находит
-// ожидающий онбординг по адресу, шифрует пароль и ставит импорт каталога.
-// Не наш адрес или онбординг не ждёт пароль — тихо игнорируем (в ящик приходит
-// много писем). Вызывается почтовым поллером.
+// ожидающий онбординг по адресу, шифрует пароль и переводит его в статус 'ready'
+// (данные собраны, ждём подтверждения продавцом — импорт не запускается до
+// сохранения). Не наш адрес — тихо игнорируем. Вызывается почтовым поллером.
 func (s *KaspiOnboardingService) SetEmployeePassword(ctx context.Context, employeeEmail, password string) error {
 	employeeEmail = strings.ToLower(strings.TrimSpace(employeeEmail))
 	p, err := s.repo.FindPendingByEmail(ctx, employeeEmail)
@@ -225,23 +221,97 @@ func (s *KaspiOnboardingService) SetEmployeePassword(ctx context.Context, employ
 	if err := s.repo.SetPassword(ctx, p.ID, cipher); err != nil {
 		return err
 	}
-	// Импорт каталога воркером: вход служебного сотрудника по логину-адресу и
-	// паролю; коды MFA придут на тот же адрес и будут выданы через jobs-API.
+	s.log.Info("получен пароль служебного сотрудника, данные магазина готовы к подтверждению",
+		slog.Int64("onboarding_id", p.ID))
+	return nil
+}
+
+// ReviewData — собранные данные для формы подтверждения магазина.
+type ReviewData struct {
+	StoreName  string
+	Email      string
+	Password   string
+	Token      string
+	MerchantID string
+}
+
+// Review возвращает собранные данные онбординга для формы (статус 'ready').
+func (s *KaspiOnboardingService) Review(ctx context.Context, accountID, id int64) (*ReviewData, error) {
+	o, err := s.Get(ctx, accountID, id)
+	if err != nil {
+		return nil, err
+	}
+	if o.Status != model.OnboardingReady {
+		return nil, ErrOnboardingState
+	}
+	d, err := s.repo.LoadForSave(ctx, id)
+	if err != nil {
+		return nil, httpx.ErrInternal(err)
+	}
+	token, _ := s.box.DecryptString(d.TokenCipher)
+	password, _ := s.box.DecryptString(d.PasswordCipher)
+	return &ReviewData{
+		StoreName: o.StoreName, Email: d.EmployeeEmail, Password: password, Token: token, MerchantID: d.MerchantID,
+	}, nil
+}
+
+// SaveStore создаёт магазин по собранным и подтверждённым продавцом данным (с
+// проверкой токена) и ставит импорт каталога. Значения берутся из формы, поэтому
+// продавец может их поправить перед сохранением (как addKaspiShop.php).
+func (s *KaspiOnboardingService) SaveStore(ctx context.Context, accountID, id int64, name, email, password, token string) error {
+	o, err := s.Get(ctx, accountID, id)
+	if err != nil {
+		return err
+	}
+	if o.Status != model.OnboardingReady {
+		return ErrOnboardingState
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ErrStoreNameRequired
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	token = strings.TrimSpace(token)
+	if token == "" || email == "" || password == "" {
+		return ErrOnboardingState
+	}
+
+	d, err := s.repo.LoadForSave(ctx, id)
+	if err != nil {
+		return httpx.ErrInternal(err)
+	}
+
+	passCipher, err := s.box.EncryptString(password)
+	if err != nil {
+		return httpx.ErrInternal(err)
+	}
+
+	// Проверка токена и создание магазина с реквизитами кабинета.
+	storeID, connID, err := s.conn.CreateKaspiStoreFromToken(ctx, accountID, name, token, KaspiCabinetCreds{
+		Login: email, PasswordCipher: passCipher, MerchantUID: d.MerchantID,
+	})
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SetStore(ctx, id, storeID, connID); err != nil {
+		return httpx.ErrInternal(err)
+	}
+
+	// Импорт каталога воркером: вход служебного сотрудника по логину и паролю.
 	if _, err := s.jobs.Enqueue(ctx, jobs.Enqueue{
 		Kind:      jobs.KindKaspiSyncCatalog,
 		Execution: jobs.Remote,
+		AccountID: accountID,
 		Payload: map[string]any{
-			"connection_id":     p.ConnectionID,
-			"login":             employeeEmail,
+			"connection_id":     connID,
+			"login":             email,
 			"password":          password,
-			"selected_merchant": p.MerchantID,
+			"selected_merchant": d.MerchantID,
 		},
-		DedupKey: fmt.Sprintf("kaspi_sync_catalog:%d", p.ConnectionID),
+		DedupKey: fmt.Sprintf("kaspi_sync_catalog:%d", connID),
 	}); err != nil {
-		return err
+		s.log.Warn("не удалось поставить импорт каталога", slog.Int64("connection_id", connID), slog.Any("error", err))
 	}
-	s.log.Info("получен пароль служебного сотрудника, поставлен импорт каталога",
-		slog.Int64("onboarding_id", p.ID), slog.Int64("connection_id", p.ConnectionID))
 	return nil
 }
 

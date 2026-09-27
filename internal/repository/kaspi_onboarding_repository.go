@@ -140,11 +140,49 @@ func (r *KaspiOnboardingRepository) SaveMerchants(ctx context.Context, id int64,
 		sql.Named("id", id), sql.Named("c", cipher), sql.Named("m", merchantsJSON))
 }
 
-// CompleteEmployee фиксирует созданного сотрудника, подключённый магазин и
-// переводит онбординг в ожидание пароля.
-func (r *KaspiOnboardingRepository) CompleteEmployee(ctx context.Context, id int64, merchantID string, storeID, connID int64) error {
-	return r.exec(ctx, `UPDATE dbo.kaspi_onboarding SET merchant_id = @m, store_id = @st, connection_id = @cn, status = 'employee_created', error = NULL, updated_at = SYSUTCDATETIME() WHERE id = @id;`,
-		sql.Named("id", id), sql.Named("m", merchantID), sql.Named("st", storeID), sql.Named("cn", connID))
+// SetEmployeeToken сохраняет полученный из кабинета токен API и uid кабинета,
+// переводя онбординг в ожидание пароля сотрудника из письма. Магазин ещё не
+// создаётся — данные сначала собираются в форму (флоу как в проекте на PHP).
+func (r *KaspiOnboardingRepository) SetEmployeeToken(ctx context.Context, id int64, merchantID string, tokenCipher []byte) error {
+	return r.exec(ctx, `UPDATE dbo.kaspi_onboarding SET merchant_id = @m, token_ciphertext = @t, status = 'employee_created', error = NULL, updated_at = SYSUTCDATETIME() WHERE id = @id;`,
+		sql.Named("id", id), sql.Named("m", merchantID), sql.Named("t", tokenCipher))
+}
+
+// SetStore фиксирует созданный при сохранении магазин и подключение и переводит
+// онбординг в статус «каталог поставлен».
+func (r *KaspiOnboardingRepository) SetStore(ctx context.Context, id, storeID, connID int64) error {
+	return r.exec(ctx, `UPDATE dbo.kaspi_onboarding SET store_id = @st, connection_id = @cn, status = 'catalog_queued', error = NULL, updated_at = SYSUTCDATETIME() WHERE id = @id;`,
+		sql.Named("id", id), sql.Named("st", storeID), sql.Named("cn", connID))
+}
+
+// SaveData — собранные онбордингом данные для показа в форме и сохранения магазина.
+type SaveData struct {
+	AccountID      int64
+	StoreName      string
+	EmployeeEmail  string
+	MerchantID     string
+	TokenCipher    []byte
+	PasswordCipher []byte
+}
+
+// LoadForSave возвращает собранные данные онбординга (для формы и сохранения).
+func (r *KaspiOnboardingRepository) LoadForSave(ctx context.Context, id int64) (*SaveData, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `
+		SELECT account_id, store_name, ISNULL(employee_email, ''), ISNULL(merchant_id, ''),
+		       token_ciphertext, password_ciphertext
+		FROM dbo.kaspi_onboarding WHERE id = @id;`
+	var d SaveData
+	err := r.db.QueryRowContext(ctx, query, sql.Named("id", id)).
+		Scan(&d.AccountID, &d.StoreName, &d.EmployeeEmail, &d.MerchantID, &d.TokenCipher, &d.PasswordCipher)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository: данные сохранения онбординга %d: %w", id, database.MapError(err))
+	}
+	return &d, nil
 }
 
 // SetStatus обновляет только статус (например, verifying при постановке задачи).
@@ -189,10 +227,10 @@ func (r *KaspiOnboardingRepository) FindPendingByEmail(ctx context.Context, emai
 	return &p, nil
 }
 
-// SetPassword сохраняет зашифрованный пароль сотрудника и переводит статус в
-// catalog_queued (импорт каталога поставлен).
+// SetPassword сохраняет зашифрованный пароль сотрудника и переводит онбординг в
+// статус 'ready': все данные собраны, продавцу показывается форма подтверждения.
 func (r *KaspiOnboardingRepository) SetPassword(ctx context.Context, id int64, cipher []byte) error {
-	return r.exec(ctx, `UPDATE dbo.kaspi_onboarding SET password_ciphertext = @c, status = 'catalog_queued', updated_at = SYSUTCDATETIME() WHERE id = @id;`,
+	return r.exec(ctx, `UPDATE dbo.kaspi_onboarding SET password_ciphertext = @c, status = 'ready', updated_at = SYSUTCDATETIME() WHERE id = @id;`,
 		sql.Named("id", id), sql.Named("c", cipher))
 }
 

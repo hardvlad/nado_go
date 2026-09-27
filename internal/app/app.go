@@ -216,6 +216,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		SecureCookies: cfg.IsProduction(),
 		PublicURL:     cfg.App.PublicURL,
 		TrialDays:     cfg.Trial.Days,
+		ShopSuffix:    cfg.Platform.ShopSuffix,
 	})
 
 	// Витрина магазина (публичная часть): темы, каталог, выбор магазина по slug/Host.

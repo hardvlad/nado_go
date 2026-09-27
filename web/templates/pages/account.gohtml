@@ -7,6 +7,7 @@
         </header>
 
         {{ if .Connected }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "account.store_connected") }}{{ end }}
+        {{ if .Saved }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "account.store_saved") }}{{ end }}
 
         <div class="dashboard">
             <div class="dashboard__main">
@@ -23,7 +24,12 @@
                             <span class="store-card__name">{{ .Name }}</span>
                             <span class="badge badge--{{ if eq .Status "active" }}active{{ else }}muted{{ end }}">{{ .Status }}</span>
                         </div>
-                        <p class="store-card__slug">{{ .Slug }}.nado.kz</p>
+                        <p class="store-card__slug"><a href="{{ .URL }}" target="_blank" rel="noopener">{{ $.L.T "account.store_open" }}{{ template "icon" "arrow" }}</a></p>
+                        {{ if .TrialActive }}
+                        <p class="store-card__trial">{{ $.L.T "account.trial_left" "Days" .TrialDaysLeft "Date" (formatDate "02.01.2006 15:04" .TrialEndsAt) }}</p>
+                        {{ else if not .TrialEndsAt.IsZero }}
+                        <p class="store-card__trial text-danger">{{ $.L.T "account.trial_expired" "Date" (formatDate "02.01.2006 15:04" .TrialEndsAt) }}</p>
+                        {{ end }}
                         {{ if .Marketplace }}
                         <p class="store-card__conn">
                             {{ .Marketplace | upper }} ·
@@ -36,6 +42,7 @@
                             {{ else }}{{ $.L.T "account.store_orders_synced" "At" (formatDate "02.01.2006 15:04" .OrdersSyncAt) }}{{ end }}
                         </p>
                         {{ end }}
+                        <p class="store-card__actions"><a href="{{ .EditURL }}">{{ $.L.T "account.store_edit" }}</a></p>
                     </li>
                     {{ end }}
                 </ul>

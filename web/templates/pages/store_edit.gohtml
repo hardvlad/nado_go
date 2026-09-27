@@ -1,0 +1,27 @@
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "box" }}</span>
+            <h1 class="page-head__title">{{ .L.T "stores.edit_heading" }}</h1>
+            <p class="page-head__lead">{{ .L.T "stores.edit_lead" }}</p>
+        </header>
+
+        <form class="form-card" method="post" action="{{ .Action }}" novalidate>
+            {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+            {{ template "field" dict "Form" .Form "Name" "name" "Label" (.L.T "stores.name_label") "Type" "text"
+                "Required" true "Min" 2 "Max" 200 }}
+            {{ template "field" dict "Form" .Form "Name" "email" "Label" (.L.T "stores.lk_email") "Type" "email"
+                "Autocomplete" "off" "Max" 320 }}
+            {{ template "field" dict "Form" .Form "Name" "password" "Label" (.L.T "stores.lk_password") "Type" "password"
+                "Autocomplete" "new-password" "Max" 200 "Optional" (.L.T "form.optional") "Hint" (.L.T "stores.lk_password_hint") }}
+            {{ template "field" dict "Form" .Form "Name" "token" "Label" (.L.T "stores.token_label") "Type" "text"
+                "Required" true "Max" 400 "Hint" (.L.T "stores.token_hint") }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "stores.save_submit" }}</button>
+            <p class="form-card__footer"><a href="{{ .Links.Account }}">{{ .L.T "error.home" }}</a></p>
+        </form>
+    </div>
+</section>
+{{ end }}

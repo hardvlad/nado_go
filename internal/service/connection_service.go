@@ -47,25 +47,18 @@ func NewConnectionService(stores *repository.StoreRepository, orders *repository
 	return &ConnectionService{stores: stores, orders: orders, box: box, kaspi: k, jobs: jobsRepo, shopSuffix: shopSuffix, trialDays: trialDays, log: log}
 }
 
-// ConnectKaspi создаёт магазин с подключением к Kaspi по токену официального
-// API, проверяет токен и ставит первый импорт заказов. Возвращает id подключения.
-func (s *ConnectionService) ConnectKaspi(ctx context.Context, accountID int64, storeName, token string) (int64, error) {
-	storeName = strings.TrimSpace(storeName)
-	token = strings.TrimSpace(token)
-	if storeName == "" {
-		return 0, ErrStoreNameRequired
-	}
-	if token == "" {
-		return 0, ErrKaspiTokenInvalid
-	}
-	_, connID, err := s.CreateKaspiStoreFromToken(ctx, accountID, storeName, token)
-	return connID, err
+// KaspiCabinetCreds — реквизиты кабинета, сохраняемые на подключении для
+// повторной проверки и редактирования. PasswordCipher уже зашифрован.
+type KaspiCabinetCreds struct {
+	Login          string
+	PasswordCipher []byte
+	MerchantUID    string
 }
 
 // CreateKaspiStoreFromToken проверяет токен официального API, создаёт магазин с
-// подключением и ставит первый импорт заказов. Используется и подключением по
-// токену (ConnectKaspi), и кабинетным онбордингом (токен получен из кабинета).
-func (s *ConnectionService) CreateKaspiStoreFromToken(ctx context.Context, accountID int64, storeName, token string) (storeID, connID int64, err error) {
+// подключением (сохраняя реквизиты кабинета) и ставит первый импорт заказов.
+// Вызывается кабинетным онбордингом при сохранении магазина продавцом.
+func (s *ConnectionService) CreateKaspiStoreFromToken(ctx context.Context, accountID int64, storeName, token string, cab KaspiCabinetCreds) (storeID, connID int64, err error) {
 	info, err := s.kaspi.Verify(ctx, token)
 	if err != nil {
 		if errors.Is(err, kaspi.ErrUnauthorized) {
@@ -82,17 +75,20 @@ func (s *ConnectionService) CreateKaspiStoreFromToken(ctx context.Context, accou
 
 	params := func() repository.NewConnection {
 		return repository.NewConnection{
-			AccountID:        accountID,
-			Name:             storeName,
-			Slug:             genSlug(storeName),
-			Country:          "KZ",
-			BaseCurrency:     "KZT",
-			Marketplace:      "kaspi",
-			SecretCiphertext: cipher,
-			PublicMeta:       string(meta),
-			ConnectionName:   storeName,
-			ShopSuffix:       s.shopSuffix,
-			TrialDays:        s.trialDays,
+			AccountID:             accountID,
+			Name:                  storeName,
+			Slug:                  genSlug(storeName),
+			Country:               "KZ",
+			BaseCurrency:          "KZT",
+			Marketplace:           "kaspi",
+			SecretCiphertext:      cipher,
+			PublicMeta:            string(meta),
+			ConnectionName:        storeName,
+			ShopSuffix:            s.shopSuffix,
+			TrialDays:             s.trialDays,
+			CabinetLogin:          cab.Login,
+			CabinetPasswordCipher: cab.PasswordCipher,
+			MerchantUID:           cab.MerchantUID,
 		}
 	}
 
@@ -117,6 +113,103 @@ func (s *ConnectionService) CreateKaspiStoreFromToken(ctx context.Context, accou
 	}
 
 	return storeID, connID, nil
+}
+
+// ErrStoreNotFound — магазин не найден или чужой.
+var ErrStoreNotFound = errors.New("service: магазин не найден")
+
+// KaspiStoreEdit — данные магазина для формы редактирования.
+type KaspiStoreEdit struct {
+	StoreID      int64
+	Name         string
+	Token        string // расшифрованный токен API
+	CabinetLogin string
+	MerchantUID  string
+}
+
+// StoreForEdit возвращает магазин аккаунта для формы редактирования.
+func (s *ConnectionService) StoreForEdit(ctx context.Context, accountID, storeID int64) (*KaspiStoreEdit, error) {
+	e, err := s.stores.GetStoreForEdit(ctx, accountID, storeID)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, ErrStoreNotFound
+	}
+	if err != nil {
+		return nil, httpx.ErrInternal(err)
+	}
+	token, err := s.box.DecryptString(e.SecretCiphertext)
+	if err != nil {
+		return nil, httpx.ErrInternal(err)
+	}
+	return &KaspiStoreEdit{StoreID: e.StoreID, Name: e.Name, Token: token, CabinetLogin: e.CabinetLogin, MerchantUID: e.MerchantUID}, nil
+}
+
+// UpdateKaspiStore проверяет новый токен, обновляет магазин и реквизиты кабинета
+// и переставляет синхронизацию, если реквизиты кабинета заданы. Пустой пароль —
+// не менять. Как ветка редактирования в AddKaspiShop.php: проверка при сохранении.
+func (s *ConnectionService) UpdateKaspiStore(ctx context.Context, accountID, storeID int64, name, token, cabinetLogin, cabinetPassword string) error {
+	name = strings.TrimSpace(name)
+	token = strings.TrimSpace(token)
+	cabinetLogin = strings.ToLower(strings.TrimSpace(cabinetLogin))
+	if name == "" {
+		return ErrStoreNameRequired
+	}
+	if token == "" {
+		return ErrKaspiTokenInvalid
+	}
+
+	e, err := s.stores.GetStoreForEdit(ctx, accountID, storeID)
+	if errors.Is(err, database.ErrNotFound) {
+		return ErrStoreNotFound
+	}
+	if err != nil {
+		return httpx.ErrInternal(err)
+	}
+
+	// Проверка токена официальным API (как validateToken в PHP).
+	if _, err := s.kaspi.Verify(ctx, token); err != nil {
+		if errors.Is(err, kaspi.ErrUnauthorized) {
+			return ErrKaspiTokenInvalid
+		}
+		return httpx.ErrInternal(err)
+	}
+
+	tokenCipher, err := s.box.EncryptString(token)
+	if err != nil {
+		return httpx.ErrInternal(err)
+	}
+	var passCipher []byte
+	if cabinetPassword != "" {
+		if passCipher, err = s.box.EncryptString(cabinetPassword); err != nil {
+			return httpx.ErrInternal(err)
+		}
+	}
+
+	if err := s.stores.UpdateStore(ctx, repository.UpdateStoreForEdit{
+		StoreID: e.StoreID, ConnectionID: e.ConnectionID, CredentialsID: e.CredentialsID,
+		Name: name, TokenCipher: tokenCipher, CabinetLogin: cabinetLogin,
+		CabinetPasswordCipher: passCipher, MerchantUID: e.MerchantUID,
+	}); err != nil {
+		return httpx.ErrInternal(err)
+	}
+
+	// Обновить заказы всегда; каталог — если есть логин кабинета (и новый пароль,
+	// либо уже сохранённый).
+	if _, err := s.jobs.Enqueue(ctx, jobs.Enqueue{
+		Kind: jobs.KindKaspiImportOrders, Execution: jobs.Local, AccountID: accountID,
+		Payload: map[string]any{"connection_id": e.ConnectionID}, DedupKey: fmt.Sprintf("kaspi_orders:%d", e.ConnectionID),
+	}); err != nil {
+		s.log.Warn("edit: не удалось поставить импорт заказов", slog.Int64("connection_id", e.ConnectionID), slog.Any("error", err))
+	}
+	if cabinetLogin != "" && cabinetPassword != "" {
+		if _, err := s.jobs.Enqueue(ctx, jobs.Enqueue{
+			Kind: jobs.KindKaspiSyncCatalog, Execution: jobs.Remote,
+			Payload:  map[string]any{"connection_id": e.ConnectionID, "login": cabinetLogin, "password": cabinetPassword, "selected_merchant": e.MerchantUID},
+			DedupKey: fmt.Sprintf("kaspi_sync_catalog:%d", e.ConnectionID),
+		}); err != nil {
+			s.log.Warn("edit: не удалось поставить импорт каталога", slog.Int64("connection_id", e.ConnectionID), slog.Any("error", err))
+		}
+	}
+	return nil
 }
 
 // ImportKaspiOrders — тело фоновой задачи kaspi.import_orders.

@@ -42,6 +42,9 @@ type Deps struct {
 	PublicURL string
 	// TrialDays — длительность бесплатного пробного периода магазина (для лендинга).
 	TrialDays int
+	// ShopSuffix — домен витрин (<slug>.<suffix>) для ссылок на магазин; пусто —
+	// локальный режим (ссылка вида /shop/{slug}).
+	ShopSuffix string
 }
 
 type PageHandler struct {
@@ -86,10 +89,11 @@ func (h *PageHandler) Routes() chi.Router {
 		r.Post("/phone/verify", h.wrap(h.PhoneVerify))
 	}
 
-	// Подключение магазина к Kaspi.
+	// Подключение и редактирование магазина Kaspi (только через кабинет).
 	if h.Connections != nil {
 		r.Get("/stores/new", h.wrap(h.StoreConnectForm))
-		r.Post("/stores/new", h.wrap(h.StoreConnectSubmit))
+		r.Get("/stores/{id}/edit", h.wrap(h.StoreEditForm))
+		r.Post("/stores/{id}/edit", h.wrap(h.StoreEditSubmit))
 	}
 
 	// Подключение через кабинет Kaspi (служебный сотрудник по SMS-коду владельца).
@@ -98,6 +102,7 @@ func (h *PageHandler) Routes() chi.Router {
 		r.Get("/stores/kaspi/{id}", h.wrap(h.KaspiCabinetStatus))
 		r.Post("/stores/kaspi/{id}/code", h.wrap(h.KaspiCabinetCode))
 		r.Post("/stores/kaspi/{id}/merchant", h.wrap(h.KaspiCabinetMerchant))
+		r.Post("/stores/kaspi/{id}/save", h.wrap(h.KaspiCabinetSave))
 	}
 	return r
 }

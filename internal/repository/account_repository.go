@@ -98,3 +98,11 @@ func verifiedAt(verified bool) sql.NullTime {
 
 // nullInt64 превращает 0 в NULL — для необязательных внешних ключей.
 func nullInt64(v int64) sql.NullInt64 { return sql.NullInt64{Int64: v, Valid: v != 0} }
+
+// nullBytes отдаёт NULL для пустого среза байт (для nullable VARBINARY).
+func nullBytes(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
+}
