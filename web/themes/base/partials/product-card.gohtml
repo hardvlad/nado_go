@@ -3,7 +3,7 @@
 {{ $p := .P }}
 <a class="card" href="{{ .LangBase }}/p/{{ $p.Slug }}-{{ $p.ID }}">
   <div class="card__media">
-    {{ if $p.Images }}<img src="{{ index $p.Images 0 }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
+    {{ if $p.Images }}<img src="{{ img (index $p.Images 0) }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
   </div>
   <div class="card__body">
     <span class="card__title">{{ $p.Title }}</span>

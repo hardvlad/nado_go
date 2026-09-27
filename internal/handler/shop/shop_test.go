@@ -240,6 +240,30 @@ func TestProductPage(t *testing.T) {
 	}
 }
 
+func TestProductGalleryMultipleImages(t *testing.T) {
+	cat := fakeCatalog{product: &model.Product{
+		ID: 5, Title: "Телефон", Slug: "telefon", VariantID: 9, PriceMinor: 250000, Currency: "KZT",
+		Available: true, Images: []string{"a.jpg", "b.jpg", "c.jpg"},
+	}}
+	h := testHandlerFull(t, activeStores(), cat, fakeCart{}, fakeOrders{}, fakeCustomers{})
+	rec := httptest.NewRecorder()
+	h.DevHandler()(rec, httptest.NewRequest(http.MethodGet, "/shop/acme/p/telefon-5", nil))
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("статус %d", rec.Code)
+	}
+	// Переключаемая галерея: радиокнопки, слайды и подписи-миниатюры для каждого фото.
+	if strings.Count(body, `class="gallery__slide"`) != 3 {
+		t.Errorf("ожидалось 3 слайда, тело: %s", body)
+	}
+	if strings.Count(body, `for="pgal-`) != 3 {
+		t.Errorf("ожидалось 3 миниатюры-подписи")
+	}
+	if !strings.Contains(body, `id="pgal-0"`) || !strings.Contains(body, "checked") {
+		t.Errorf("первое фото должно быть выбрано по умолчанию")
+	}
+}
+
 func TestProductNotFound(t *testing.T) {
 	h := testHandlerFull(t, activeStores(), fakeCatalog{}, fakeCart{}, fakeOrders{}, fakeCustomers{})
 	rec := httptest.NewRecorder()

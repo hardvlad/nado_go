@@ -224,7 +224,8 @@ func New(ctx context.Context, version string) (*App, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("app: темы витрины: %w", err)
 	}
-	themeRenderer, err := theme.New(themesFS, theme.WithDebug(cfg.App.Debug))
+	themeRenderer, err := theme.New(themesFS,
+		theme.WithDebug(cfg.App.Debug), theme.WithImageCDN(cfg.Kaspi.ImagesCDNURL))
 	if err != nil {
 		_ = db.Close()
 		return nil, err

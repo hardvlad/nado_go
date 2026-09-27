@@ -26,9 +26,10 @@ const (
 // Renderer компилирует и кеширует шаблоны тем. Базовая тема прогревается при
 // старте (ошибка шаблона валит приложение сразу). В debug шаблоны перечитываются.
 type Renderer struct {
-	fsys  fs.FS // корень web/themes (подкаталог на тему)
-	funcs template.FuncMap
-	debug bool
+	fsys     fs.FS // корень web/themes (подкаталог на тему)
+	funcs    template.FuncMap
+	debug    bool
+	imageCDN string // префикс CDN для относительных ссылок на изображения
 
 	mu    sync.RWMutex
 	cache map[string]*template.Template
@@ -38,12 +39,19 @@ type Option func(*Renderer)
 
 func WithDebug(debug bool) Option { return func(r *Renderer) { r.debug = debug } }
 
+// WithImageCDN задаёт базовый адрес CDN, который дописывается к относительным
+// ссылкам изображений при показе (в базе они хранятся как есть).
+func WithImageCDN(base string) Option {
+	return func(r *Renderer) { r.imageCDN = strings.TrimRight(base, "/") }
+}
+
 // New создаёт рендер поверх ФС тем и прогревает базовую тему.
 func New(fsys fs.FS, opts ...Option) (*Renderer, error) {
-	r := &Renderer{fsys: fsys, funcs: builtinFuncs(), cache: map[string]*template.Template{}}
+	r := &Renderer{fsys: fsys, cache: map[string]*template.Template{}}
 	for _, opt := range opts {
 		opt(r)
 	}
+	r.funcs = builtinFuncs(r.imageCDN)
 	if err := r.warmup(baseTheme); err != nil {
 		return nil, err
 	}
@@ -170,9 +178,22 @@ func exists(fsys fs.FS, name string) bool {
 	return true
 }
 
-// builtinFuncs — функции шаблонов витрины.
-func builtinFuncs() template.FuncMap {
+// builtinFuncs — функции шаблонов витрины. imageCDN дописывается к относительным
+// ссылкам изображений функцией img.
+func builtinFuncs(imageCDN string) template.FuncMap {
 	return template.FuncMap{
+		// img строит адрес изображения: абсолютные ссылки отдаёт как есть,
+		// относительные (как хранит зеркало Kaspi) склеивает с CDN-префиксом.
+		"img": func(path string) string {
+			if path == "" || imageCDN == "" ||
+				strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "//") {
+				return path
+			}
+			if strings.HasPrefix(path, "/") {
+				return imageCDN + path
+			}
+			return imageCDN + "/" + path
+		},
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: нечётное число аргументов")

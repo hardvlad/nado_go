@@ -2,16 +2,25 @@
 {{ $p := .Product }}
 <nav class="breadcrumbs"><a href="{{ .LangBase }}/">{{ .L.T "shop.home_title" }}</a> / {{ $p.Title }}</nav>
 <article class="product">
+  {{ if gt (len $p.Images) 1 }}
+  {{/* Галерея без JS (CSP script-src 'self'): радиокнопки-переключатели + подписи.
+       Клик по миниатюре выбирает её радиокнопку, а CSS показывает нужное фото. */}}
+  <div class="gallery">
+    {{ range $i, $u := $p.Images }}<input class="gallery__radio" type="radio" name="pgal" id="pgal-{{ $i }}" aria-label="{{ $p.Title }}"{{ if eq $i 0 }} checked{{ end }}>{{ end }}
+    <div class="gallery__main">
+      {{ range $i, $u := $p.Images }}<img class="gallery__slide" src="{{ img $u }}" alt="{{ $p.Title }}"{{ if ne $i 0 }} loading="lazy"{{ end }}>{{ end }}
+    </div>
+    <div class="gallery__thumbs">
+      {{ range $i, $u := $p.Images }}<label class="gallery__thumb" for="pgal-{{ $i }}"><img src="{{ img $u }}" alt="" loading="lazy"></label>{{ end }}
+    </div>
+  </div>
+  {{ else }}
   <div class="gallery">
     <div class="gallery__main">
-      {{ if $p.Images }}<img src="{{ index $p.Images 0 }}" alt="{{ $p.Title }}">{{ end }}
+      {{ if $p.Images }}<img src="{{ img (index $p.Images 0) }}" alt="{{ $p.Title }}">{{ end }}
     </div>
-    {{ if gt (len $p.Images) 1 }}
-    <div class="gallery__thumbs">
-      {{ range $p.Images }}<img src="{{ . }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
-    </div>
-    {{ end }}
   </div>
+  {{ end }}
 
   <div class="product__info">
     <h1>{{ $p.Title }}</h1>

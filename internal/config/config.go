@@ -48,6 +48,10 @@ type Kaspi struct {
 	// см. Mailbox). Адреса вида s{onboardingID}-{rand}@<домен>. Пусто — кабинетный
 	// онбординг недоступен.
 	EmployeeEmailDomain string
+	// ImagesCDNURL — базовый адрес CDN изображений Kaspi. В базе ссылки на фото
+	// хранятся как отдал кабинет (относительные), а при показе на витрину к ним
+	// добавляется этот префикс. Пусто — ссылки выводятся как есть.
+	ImagesCDNURL string
 }
 
 // Mailbox — общий почтовый ящик служебных сотрудников Kaspi (IMAP). Из писем
@@ -188,6 +192,7 @@ func Load() (*Config, error) {
 		},
 		Kaspi: Kaspi{
 			EmployeeEmailDomain: env("KASPI_EMPLOYEE_EMAIL_DOMAIN", "kaspi.nado.kz"),
+			ImagesCDNURL:        strings.TrimRight(env("KASPI_IMAGES_CDN_URL", ""), "/"),
 		},
 		Platform: Platform{
 			RootHost:   strings.ToLower(env("PLATFORM_ROOT_HOST", "")),
