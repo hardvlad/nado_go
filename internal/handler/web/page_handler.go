@@ -40,6 +40,8 @@ type Deps struct {
 	// PublicURL — адрес сайта для canonical и hreflang, например https://nado.kz.
 	// Пусто — ссылки относительные.
 	PublicURL string
+	// TrialDays — длительность бесплатного пробного периода магазина (для лендинга).
+	TrialDays int
 }
 
 type PageHandler struct {
@@ -71,6 +73,7 @@ func (h *PageHandler) Routes() chi.Router {
 	r.Post("/contact", h.wrap(h.ContactSubmit))
 	r.Get("/register", h.wrap(h.RegisterForm))
 	r.Post("/register", h.wrap(h.RegisterSubmit))
+	r.Post("/register/verify", h.wrap(h.RegisterVerify))
 	r.Get("/login", h.wrap(h.LoginForm))
 	r.Post("/login", h.wrap(h.LoginSubmit))
 	r.Post("/logout", h.wrap(h.Logout))
@@ -171,22 +174,23 @@ func (h *PageHandler) ensureLocalizer(r *http.Request) *http.Request {
 
 // Links — адреса страниц на текущем языке.
 type Links struct {
-	Home, Contact, Register, Login, Logout, Account string
-	Phone, PhoneVerify, StoreNew, KaspiCabinet      string
+	Home, Contact, Register, RegisterVerify, Login, Logout, Account string
+	Phone, PhoneVerify, StoreNew, KaspiCabinet                      string
 }
 
 func linksFor(lang i18n.Lang) Links {
 	return Links{
-		Home:         i18n.Localize(lang, "/"),
-		Contact:      i18n.Localize(lang, "/contact"),
-		Register:     i18n.Localize(lang, "/register"),
-		Login:        i18n.Localize(lang, "/login"),
-		Logout:       i18n.Localize(lang, "/logout"),
-		Account:      i18n.Localize(lang, "/account"),
-		Phone:        i18n.Localize(lang, "/phone"),
-		PhoneVerify:  i18n.Localize(lang, "/phone/verify"),
-		StoreNew:     i18n.Localize(lang, "/stores/new"),
-		KaspiCabinet: i18n.Localize(lang, "/stores/kaspi"),
+		Home:           i18n.Localize(lang, "/"),
+		Contact:        i18n.Localize(lang, "/contact"),
+		Register:       i18n.Localize(lang, "/register"),
+		RegisterVerify: i18n.Localize(lang, "/register/verify"),
+		Login:          i18n.Localize(lang, "/login"),
+		Logout:         i18n.Localize(lang, "/logout"),
+		Account:        i18n.Localize(lang, "/account"),
+		Phone:          i18n.Localize(lang, "/phone"),
+		PhoneVerify:    i18n.Localize(lang, "/phone/verify"),
+		StoreNew:       i18n.Localize(lang, "/stores/new"),
+		KaspiCabinet:   i18n.Localize(lang, "/stores/kaspi"),
 	}
 }
 

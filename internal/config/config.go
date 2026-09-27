@@ -23,6 +23,13 @@ type Config struct {
 	Mailbox   Mailbox
 	Kaspi     Kaspi
 	Platform  Platform
+	Trial     Trial
+}
+
+// Trial — бесплатный пробный период магазина и напоминания об оплате.
+type Trial struct {
+	Days             int           // сколько дней бесплатно с момента добавления магазина
+	ReminderInterval time.Duration // как часто сканировать магазины на напоминания
 }
 
 // Platform — хосты платформы для маршрутизации по Host (D-04, D-18).
@@ -186,6 +193,10 @@ func Load() (*Config, error) {
 			RootHost:   strings.ToLower(env("PLATFORM_ROOT_HOST", "")),
 			AppHost:    strings.ToLower(env("PLATFORM_APP_HOST", "")),
 			ShopSuffix: strings.ToLower(strings.TrimPrefix(env("PLATFORM_SHOP_SUFFIX", ""), ".")),
+		},
+		Trial: Trial{
+			Days:             envInt("TRIAL_DAYS", 14),
+			ReminderInterval: envDuration("TRIAL_REMINDER_INTERVAL", 6*time.Hour),
 		},
 	}
 

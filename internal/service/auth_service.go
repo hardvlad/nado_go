@@ -237,22 +237,39 @@ func (s *AuthService) LoginByPhone(ctx context.Context, phone string, client Cli
 
 // RegisterByPhone создаёт аккаунт и владельца с подтверждённым телефоном без
 // пароля и открывает сессию. Телефон должен быть уже проверен кодом до вызова.
-func (s *AuthService) RegisterByPhone(ctx context.Context, name, phone, locale string, client ClientMeta) (string, error) {
+// name — название компании или имя (обязательно), email — необязателен. Тариф
+// на регистрации не выбирается: пробный период даётся при добавлении магазина.
+func (s *AuthService) RegisterByPhone(ctx context.Context, name, email, phone, locale string, client ClientMeta) (string, error) {
 	name = strings.TrimSpace(name)
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	fields := map[string]httpx.FieldError{}
 	if len([]rune(name)) < 2 {
-		return "", httpx.ErrFields(map[string]httpx.FieldError{"name": {Tag: "required"}})
+		fields["name"] = httpx.FieldError{Tag: "required"}
+	}
+	if email != "" {
+		if f, err := httpx.CheckFields(struct {
+			Email string `validate:"omitempty,email,max=255"`
+		}{Email: email}); err != nil {
+			return "", err
+		} else if _, bad := f["Email"]; bad {
+			fields["email"] = httpx.FieldError{Tag: "email"}
+		}
 	}
 	norm, ok := NormalizePhone(phone)
 	if !ok {
-		return "", ErrOTPInvalidPhone
+		fields["phone"] = httpx.FieldError{Tag: "phone"}
+	}
+	if len(fields) > 0 {
+		return "", httpx.ErrFields(fields)
 	}
 
 	acc, user, err := s.accounts.CreateWithOwner(ctx,
 		&model.Account{Name: name, Country: "KZ", PlanCode: "", Status: model.AccountStatusActive},
-		&model.NewUser{Name: name, Phone: norm, PhoneVerified: true, Locale: locale})
+		&model.NewUser{Name: name, Email: email, Phone: norm, PhoneVerified: true, Locale: locale})
 	if err != nil {
 		if errors.Is(err, database.ErrConflict) {
-			// Сработал уникальный индекс на подтверждённый телефон.
+			// Сработал уникальный индекс на подтверждённый телефон или email.
 			return "", ErrPhoneTaken
 		}
 		return "", httpx.ErrInternal(err)

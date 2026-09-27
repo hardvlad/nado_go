@@ -71,6 +71,12 @@ func (h *PageHandler) Session(next http.Handler) http.Handler {
 	})
 }
 
+// Регистрация продавца — по номеру телефона с кодом в WhatsApp (D-17), без
+// пароля и без выбора тарифа. Обязательно: название компании или имя и телефон;
+// email — по желанию. Пробный период даётся при добавлении магазина.
+// Шаг 1 (GET/POST /register): форма и отправка кода. Шаг 2 (POST /register/verify):
+// ввод кода → создание аккаунта.
+
 // RegisterForm — GET /register.
 func (h *PageHandler) RegisterForm(w http.ResponseWriter, r *http.Request) error {
 	l := h.localizer(r)
@@ -78,16 +84,10 @@ func (h *PageHandler) RegisterForm(w http.ResponseWriter, r *http.Request) error
 		redirect(w, r, i18n.Localize(l.Lang(), "/account"))
 		return nil
 	}
-	form := newForm()
-	plan := r.URL.Query().Get("plan")
-	if _, ok := h.Plans.Get(plan); !ok {
-		plan = h.Plans.Default()
-	}
-	form.Values["plan"] = plan
-	return h.renderRegister(w, r, http.StatusOK, form)
+	return h.renderRegister(w, r, http.StatusOK, newForm())
 }
 
-// RegisterSubmit — POST /register.
+// RegisterSubmit — POST /register: проверка полей и отправка кода на телефон.
 func (h *PageHandler) RegisterSubmit(w http.ResponseWriter, r *http.Request) error {
 	if err := parseForm(w, r); err != nil {
 		return err
@@ -95,13 +95,13 @@ func (h *PageHandler) RegisterSubmit(w http.ResponseWriter, r *http.Request) err
 	l := h.localizer(r)
 
 	form := newForm()
-	for _, f := range []string{"company", "name", "email", "phone", "plan"} {
+	for _, f := range []string{"name", "email", "phone"} {
 		form.Values[f] = r.PostFormValue(f)
 	}
 	form.Checked["consent"] = r.PostFormValue("consent") == "on"
 
 	if r.PostFormValue("website") != "" {
-		// Бот заполнил ловушку — аккаунт не создаём и ничего не объясняем.
+		// Бот заполнил ловушку — ничего не объясняем.
 		return h.renderRegister(w, r, http.StatusOK, form)
 	}
 	if !h.registerByIP.Allow("register:" + httpx.ClientIP(r)) {
@@ -109,20 +109,75 @@ func (h *PageHandler) RegisterSubmit(w http.ResponseWriter, r *http.Request) err
 		return h.renderRegister(w, r, http.StatusTooManyRequests, form)
 	}
 
-	token, err := h.Auth.Register(r.Context(), service.RegisterInput{
-		Company:  form.Values["company"],
-		Name:     form.Values["name"],
-		Email:    form.Values["email"],
-		Phone:    form.Values["phone"],
-		Password: r.PostFormValue("password"),
-		Plan:     form.Values["plan"],
-		Consent:  form.Checked["consent"],
-		Locale:   string(l.Lang()),
-		Client:   clientMeta(r),
-	})
+	// Обязательные поля: имя/компания, телефон, согласие.
+	if len([]rune(strings.TrimSpace(form.Values["name"]))) < 2 {
+		form.Errors["name"] = l.T("validation.required")
+	}
+	if !form.Checked["consent"] {
+		form.Errors["consent"] = l.T("validation.consent")
+	}
+	if len(form.Errors) > 0 {
+		return h.renderRegister(w, r, http.StatusUnprocessableEntity, form)
+	}
+
+	// Телефон нового продавца не должен быть уже зарегистрирован.
+	registered, err := h.Auth.PhoneRegistered(r.Context(), form.Values["phone"])
+	if errors.Is(err, service.ErrOTPInvalidPhone) {
+		form.Errors["phone"] = l.T("validation.phone")
+		return h.renderRegister(w, r, http.StatusUnprocessableEntity, form)
+	}
+	if err != nil {
+		return err
+	}
+	if registered {
+		form.Alert = l.T("register.phone_taken")
+		return h.renderRegister(w, r, http.StatusUnprocessableEntity, form)
+	}
+
+	phone, err := h.OTP.Request(r.Context(), form.Values["phone"], model.OTPPurposeRegister, string(l.Lang()), httpx.ClientIP(r))
+	if err != nil {
+		if msg, ok := otpErrorMessage(l, err); ok {
+			form.Alert = msg
+			return h.renderRegister(w, r, http.StatusUnprocessableEntity, form)
+		}
+		return err
+	}
+
+	// Переходим к вводу кода; данные регистрации несём в скрытых полях.
+	verify := newForm()
+	verify.Values["phone"] = phone
+	verify.Values["name"] = form.Values["name"]
+	verify.Values["email"] = form.Values["email"]
+	return h.renderRegisterVerify(w, r, http.StatusOK, verify)
+}
+
+// RegisterVerify — POST /register/verify: проверка кода и создание аккаунта.
+func (h *PageHandler) RegisterVerify(w http.ResponseWriter, r *http.Request) error {
+	if err := parseForm(w, r); err != nil {
+		return err
+	}
+	l := h.localizer(r)
+
+	form := newForm()
+	for _, f := range []string{"phone", "name", "email"} {
+		form.Values[f] = r.PostFormValue(f)
+	}
+
+	if err := h.OTP.Verify(r.Context(), form.Values["phone"], model.OTPPurposeRegister, r.PostFormValue("code")); err != nil {
+		if msg, ok := otpErrorMessage(l, err); ok {
+			form.Errors["code"] = msg
+			return h.renderRegisterVerify(w, r, http.StatusUnprocessableEntity, form)
+		}
+		return err
+	}
+
+	token, err := h.Auth.RegisterByPhone(r.Context(), form.Values["name"], form.Values["email"], form.Values["phone"], string(l.Lang()), clientMeta(r))
 	if fields, ok := httpx.FieldErrors(err); ok {
 		form.Errors = localizeFields(l, fields)
-		form.Alert = l.T("form.errors")
+		return h.renderRegisterVerify(w, r, http.StatusUnprocessableEntity, form)
+	}
+	if errors.Is(err, service.ErrPhoneTaken) {
+		form.Alert = l.T("register.phone_taken")
 		return h.renderRegister(w, r, http.StatusUnprocessableEntity, form)
 	}
 	if err != nil {
@@ -135,19 +190,13 @@ func (h *PageHandler) RegisterSubmit(w http.ResponseWriter, r *http.Request) err
 }
 
 func (h *PageHandler) renderRegister(w http.ResponseWriter, r *http.Request, status int, form FormView) error {
-	l := h.localizer(r)
-	plans := h.planViews(l)
-	var selected PlanView
-	for _, p := range plans {
-		if p.Code == form.Values["plan"] {
-			selected = p
-		}
-	}
-	data := h.page(r, "register.title").
-		With("Form", form).
-		With("Plans", plans).
-		With("SelectedPlan", selected)
+	data := h.page(r, "register.title").With("Form", form)
 	return h.Render.Render(w, status, "register", data)
+}
+
+func (h *PageHandler) renderRegisterVerify(w http.ResponseWriter, r *http.Request, status int, form FormView) error {
+	data := h.page(r, "register.title").With("Form", form)
+	return h.Render.Render(w, status, "register_verify", data)
 }
 
 // LoginForm — GET /login.

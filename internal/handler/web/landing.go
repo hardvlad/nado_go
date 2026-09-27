@@ -91,6 +91,7 @@ func (h *PageHandler) Home(w http.ResponseWriter, r *http.Request) error {
 		With("SellerBenefits", cards(l, "home.sellers", []string{"percent", "download", "refresh", "tag", "wallet", "star"})).
 		With("BuyerBenefits", cards(l, "home.buyers", []string{"tag", "truck", "message", "globe"})).
 		With("Plans", h.planViews(l)).
+		With("TrialDays", h.TrialDays).
 		With("FAQ", faq)
 
 	return h.Render.Render(w, http.StatusOK, "home", data)

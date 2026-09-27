@@ -100,7 +100,7 @@ func (h *PageHandler) PhoneVerify(w http.ResponseWriter, r *http.Request) error 
 	if registered {
 		token, err = h.Auth.LoginByPhone(r.Context(), form.Values["phone"], clientMeta(r))
 	} else {
-		token, err = h.Auth.RegisterByPhone(r.Context(), form.Values["name"], form.Values["phone"], string(l.Lang()), clientMeta(r))
+		token, err = h.Auth.RegisterByPhone(r.Context(), form.Values["name"], "", form.Values["phone"], string(l.Lang()), clientMeta(r))
 	}
 	if fields, ok := httpx.FieldErrors(err); ok {
 		form.Errors = localizeFields(l, fields)

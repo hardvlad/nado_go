@@ -39,11 +39,12 @@ type ConnectionService struct {
 	kaspi      *kaspi.Official
 	jobs       *jobs.Repository
 	shopSuffix string // домен платформы для поддомена витрины (<slug>.<suffix>)
+	trialDays  int    // бесплатный пробный период нового магазина, дней
 	log        *slog.Logger
 }
 
-func NewConnectionService(stores *repository.StoreRepository, orders *repository.MarketplaceOrderRepository, box *secrets.Box, k *kaspi.Official, jobsRepo *jobs.Repository, shopSuffix string, log *slog.Logger) *ConnectionService {
-	return &ConnectionService{stores: stores, orders: orders, box: box, kaspi: k, jobs: jobsRepo, shopSuffix: shopSuffix, log: log}
+func NewConnectionService(stores *repository.StoreRepository, orders *repository.MarketplaceOrderRepository, box *secrets.Box, k *kaspi.Official, jobsRepo *jobs.Repository, shopSuffix string, trialDays int, log *slog.Logger) *ConnectionService {
+	return &ConnectionService{stores: stores, orders: orders, box: box, kaspi: k, jobs: jobsRepo, shopSuffix: shopSuffix, trialDays: trialDays, log: log}
 }
 
 // ConnectKaspi создаёт магазин с подключением к Kaspi по токену официального
@@ -91,6 +92,7 @@ func (s *ConnectionService) CreateKaspiStoreFromToken(ctx context.Context, accou
 			PublicMeta:       string(meta),
 			ConnectionName:   storeName,
 			ShopSuffix:       s.shopSuffix,
+			TrialDays:        s.trialDays,
 		}
 	}
 

@@ -45,14 +45,17 @@ type App struct {
 	db      *database.DB
 	server  *http.Server
 	health  *api.HealthHandler
-	runner  *jobs.Runner    // встроенный воркер локальных задач
-	mailbox *mailbox.Poller // опрос почтового ящика служебных сотрудников (может быть nil)
+	runner  *jobs.Runner                  // встроенный воркер локальных задач
+	mailbox *mailbox.Poller               // опрос почтового ящика служебных сотрудников (может быть nil)
+	trial   *service.TrialReminderService // напоминания об оплате перед концом пробного периода
 
 	// runnerDone закрывается, когда встроенный воркер завершил текущую задачу.
 	// Ждём его перед закрытием БД, иначе задача оборвётся на запросе к базе.
 	runnerDone chan struct{}
 	// mailboxDone закрывается, когда поллер почты остановлен.
 	mailboxDone chan struct{}
+	// trialDone закрывается, когда планировщик напоминаний остановлен.
+	trialDone chan struct{}
 }
 
 // New загружает конфигурацию и создаёт все компоненты.
@@ -159,7 +162,7 @@ func New(ctx context.Context, version string) (*App, error) {
 	// Подключение магазинов к Kaspi (официальный Shop API) и импорт заказов.
 	connService := service.NewConnectionService(
 		repository.NewStoreRepository(db), repository.NewMarketplaceOrderRepository(db),
-		box, kaspi.NewOfficial(), jobsRepo, cfg.Platform.ShopSuffix, log)
+		box, kaspi.NewOfficial(), jobsRepo, cfg.Platform.ShopSuffix, cfg.Trial.Days, log)
 
 	// Кабинетный онбординг Kaspi: отправка SMS владельцу, создание сотрудника,
 	// приём его пароля из почты, импорт каталога (D-28).
@@ -212,6 +215,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		Feedback:      feedbackService,
 		SecureCookies: cfg.IsProduction(),
 		PublicURL:     cfg.App.PublicURL,
+		TrialDays:     cfg.Trial.Days,
 	})
 
 	// Витрина магазина (публичная часть): темы, каталог, выбор магазина по slug/Host.
@@ -272,7 +276,12 @@ func New(ctx context.Context, version string) (*App, error) {
 	// привязан к сигнальному ctx, иначе при SIGTERM активные запросы
 	// оборвутся мгновенно вместо корректного дренирования.
 
-	return &App{cfg: cfg, log: log, db: db, server: server, health: health, runner: runner, mailbox: mailboxPoller}, nil
+	// Напоминания об оплате перед окончанием пробного периода (WhatsApp).
+	trialReminders := service.NewTrialReminderService(
+		repository.NewStoreRepository(db), sender, bundle, cfg.App.PublicURL, log)
+
+	return &App{cfg: cfg, log: log, db: db, server: server, health: health,
+		runner: runner, mailbox: mailboxPoller, trial: trialReminders}, nil
 }
 
 // Run обслуживает запросы до отмены ctx, затем выполняет безопасное завершение.
@@ -297,6 +306,16 @@ func (a *App) Run(ctx context.Context) error {
 		go func() {
 			defer close(a.mailboxDone)
 			a.mailbox.Run(ctx)
+		}()
+	}
+
+	// Планировщик напоминаний об оплате: периодически сканирует магазины у порога
+	// окончания пробного периода. По отмене ctx завершается.
+	if a.trial != nil {
+		a.trialDone = make(chan struct{})
+		go func() {
+			defer close(a.trialDone)
+			a.runTrialReminders(ctx)
 		}()
 	}
 
@@ -404,8 +423,37 @@ func (a *App) closeResources() {
 			a.log.Warn("поллер почты не завершился в отведённое время")
 		}
 	}
+	// И планировщика напоминаний (ходит в БД).
+	if a.trialDone != nil {
+		select {
+		case <-a.trialDone:
+		case <-time.After(a.cfg.HTTP.ShutdownTimeout):
+			a.log.Warn("планировщик напоминаний не завершился в отведённое время")
+		}
+	}
 	if err := a.db.Close(); err != nil {
 		a.log.Error("ошибка закрытия пула БД", slog.Any("error", err))
+	}
+}
+
+// runTrialReminders периодически сканирует магазины на напоминания об оплате.
+// Первый прогон — сразу при старте; далее с интервалом из конфигурации.
+func (a *App) runTrialReminders(ctx context.Context) {
+	interval := a.cfg.Trial.ReminderInterval
+	if interval <= 0 {
+		interval = 6 * time.Hour
+	}
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		if err := a.trial.Scan(ctx); err != nil && ctx.Err() == nil {
+			a.log.Warn("напоминания об оплате: цикл сканирования", slog.Any("error", err))
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
 	}
 }
 

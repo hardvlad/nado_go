@@ -20,6 +20,7 @@ import (
 	"nado_go/internal/handler/web"
 	"nado_go/internal/i18n"
 	"nado_go/internal/model"
+	"nado_go/internal/password"
 	"nado_go/internal/router"
 	"nado_go/internal/service"
 	"nado_go/internal/view"
@@ -162,6 +163,7 @@ func (f fakePinger) Health(context.Context) error { return f.err }
 type testEnv struct {
 	srv      http.Handler
 	feedback *fakeFeedback
+	auth     *fakeAuth
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -227,7 +229,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		// порядок middleware chi: New не должен паниковать с Shop != nil).
 		Shop: &shop.Handler{},
 	})
-	return &testEnv{srv: srv, feedback: feedbackStore}
+	return &testEnv{srv: srv, feedback: feedbackStore, auth: authStore}
 }
 
 func (e *testEnv) do(t *testing.T, req *http.Request) *httptest.ResponseRecorder {
@@ -404,16 +406,26 @@ func TestContactForm(t *testing.T) {
 	}
 }
 
-func TestRegisterLoginLogout(t *testing.T) {
+func TestLoginLogout(t *testing.T) {
 	env := newTestEnv(t)
 
-	form := url.Values{
-		"company": {"Магазин Даны"}, "name": {"Дана"}, "email": {"dana@example.kz"},
-		"phone": {""}, "password": {"надёжный-пароль"}, "plan": {"pro"}, "consent": {"on"},
+	// Регистрация продавца теперь по телефону с кодом в WhatsApp (покрыта юнит-
+	// тестами service). Здесь проверяем вход по email+паролю (для существующих
+	// аккаунтов), кабинет и выход. Заводим пользователя прямо в хранилище.
+	hash, err := password.Hash("надёжный-пароль")
+	if err != nil {
+		t.Fatal(err)
 	}
-	rec := env.do(t, postForm("/en/register", form))
+	env.auth.accounts[1] = &model.Account{ID: 1, Name: "Магазин Даны", PlanCode: "pro", Status: model.AccountStatusActive}
+	env.auth.creds["dana@example.kz"] = &model.UserCredentials{
+		UserID: 1, Name: "Дана", Email: "dana@example.kz", Status: model.UserStatusActive,
+		PasswordHash: hash, AccountID: 1,
+	}
+
+	form := url.Values{"email": {"dana@example.kz"}, "password": {"надёжный-пароль"}}
+	rec := env.do(t, postForm("/en/login", form))
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/en/account" {
-		t.Fatalf("регистрация: статус %d, Location %q, тело %.300s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+		t.Fatalf("вход: статус %d, Location %q, тело %.300s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
 	session := sessionCookie(t, rec)
 	if !session.HttpOnly || session.SameSite != http.SameSiteLaxMode {
@@ -425,11 +437,6 @@ func TestRegisterLoginLogout(t *testing.T) {
 	rec = env.do(t, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Welcome, Дана!") {
 		t.Fatalf("кабинет: статус %d", rec.Code)
-	}
-
-	// Повторная регистрация с тем же email — понятная ошибка у поля.
-	if body := env.do(t, postForm("/register", form)).Body.String(); !strings.Contains(body, "Этот email уже зарегистрирован") {
-		t.Error("нет ошибки о занятом email")
 	}
 
 	// Выход удаляет сессию.

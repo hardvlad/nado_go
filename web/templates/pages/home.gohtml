@@ -15,6 +15,7 @@
                 <a class="btn btn--primary btn--lg" href="{{ .Links.Register }}">{{ .L.T "home.hero.cta_primary" }}{{ template "icon" "arrow" }}</a>
                 <a class="btn btn--ghost btn--lg" href="#pricing">{{ .L.T "home.hero.cta_secondary" }}</a>
             </div>
+            <p class="hero__note">{{ template "icon" "sparkles" }}<span>{{ .L.T "home.hero.trial" "Days" .TrialDays }}</span></p>
             <p class="hero__note">{{ template "icon" "check" }}<span>{{ .L.T "home.hero.note" }}</span></p>
         </div>
 

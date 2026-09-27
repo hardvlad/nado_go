@@ -194,7 +194,7 @@ func TestPhoneRegisterAndLogin(t *testing.T) {
 	ctx := context.Background()
 
 	// Регистрация по телефону (телефон уже подтверждён кодом выше по потоку).
-	token, err := svc.RegisterByPhone(ctx, "Ержан", "8 701 555 44 33", "kk", ClientMeta{})
+	token, err := svc.RegisterByPhone(ctx, "Ержан", "", "8 701 555 44 33", "kk", ClientMeta{})
 	if err != nil {
 		t.Fatalf("RegisterByPhone: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestPhoneRegisterAndLogin(t *testing.T) {
 	}
 
 	// Повторная регистрация того же номера — ErrPhoneTaken.
-	if _, err := svc.RegisterByPhone(ctx, "Ержан", "+7 701 555 44 33", "kk", ClientMeta{}); !errors.Is(err, ErrPhoneTaken) {
+	if _, err := svc.RegisterByPhone(ctx, "Ержан", "", "+7 701 555 44 33", "kk", ClientMeta{}); !errors.Is(err, ErrPhoneTaken) {
 		t.Fatalf("повтор номера: ожидалась ErrPhoneTaken, получено %v", err)
 	}
 

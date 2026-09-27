@@ -37,6 +37,8 @@ type NewConnection struct {
 	// ShopSuffix — домен платформы для поддомена витрины (<slug>.<suffix>).
 	// Пусто — поддомен не регистрируется (локальная разработка).
 	ShopSuffix string
+	// TrialDays — бесплатный пробный период магазина в днях (0 — без пробного).
+	TrialDays int
 }
 
 // CreateStoreWithConnection создаёт магазин, учётные данные и подключение одной
@@ -44,9 +46,10 @@ type NewConnection struct {
 func (r *StoreRepository) CreateStoreWithConnection(ctx context.Context, in NewConnection) (storeID, connectionID int64, err error) {
 	err = r.db.WithTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx *sql.Tx) error {
 		const insertStore = `
-			INSERT INTO dbo.stores (account_id, slug, name, country, base_currency, plan_code)
+			INSERT INTO dbo.stores (account_id, slug, name, country, base_currency, plan_code, trial_ends_at)
 			OUTPUT INSERTED.id
-			VALUES (@account_id, @slug, @name, @country, @base_currency, @plan_code);`
+			VALUES (@account_id, @slug, @name, @country, @base_currency, @plan_code,
+			        CASE WHEN @trial_days > 0 THEN DATEADD(day, @trial_days, SYSUTCDATETIME()) ELSE NULL END);`
 		if err := tx.QueryRowContext(ctx, insertStore,
 			sql.Named("account_id", in.AccountID),
 			sql.Named("slug", in.Slug),
@@ -54,6 +57,7 @@ func (r *StoreRepository) CreateStoreWithConnection(ctx context.Context, in NewC
 			sql.Named("country", in.Country),
 			sql.Named("base_currency", in.BaseCurrency),
 			sql.Named("plan_code", nullString(in.PlanCode)),
+			sql.Named("trial_days", in.TrialDays),
 		).Scan(&storeID); err != nil {
 			return database.MapError(err)
 		}
@@ -230,6 +234,78 @@ func (r *StoreRepository) ResolveByHost(ctx context.Context, host string) (*mode
 		FROM dbo.store_domains d JOIN dbo.stores s ON s.id = d.store_id
 		WHERE d.host = @host;`
 	return scanStorefront(r.db.QueryRowContext(ctx, query, sql.Named("host", host)))
+}
+
+// TrialCandidate — магазин с пробным периодом и контактом владельца для
+// напоминаний об оплате.
+type TrialCandidate struct {
+	StoreID     int64
+	StoreName   string
+	TrialEndsAt time.Time
+	OwnerPhone  string
+	OwnerLocale string
+}
+
+// DueTrials возвращает активные магазины, чей пробный период заканчивается в
+// окне [from, to], вместе с телефоном и языком владельца (для WhatsApp).
+func (r *StoreRepository) DueTrials(ctx context.Context, from, to time.Time) ([]TrialCandidate, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT s.id, s.name, s.trial_ends_at, u.phone, ISNULL(u.locale, '')
+		FROM dbo.stores s
+		JOIN dbo.account_members m ON m.account_id = s.account_id AND m.role = 'owner'
+		JOIN dbo.users u ON u.id = m.user_id
+		WHERE s.status = 'active' AND s.trial_ends_at IS NOT NULL
+		  AND s.trial_ends_at >= @from AND s.trial_ends_at <= @to
+		  AND u.phone IS NOT NULL AND u.phone <> '';`
+	rows, err := r.db.QueryContext(ctx, query, sql.Named("from", from.UTC()), sql.Named("to", to.UTC()))
+	if err != nil {
+		return nil, fmt.Errorf("repository: магазины с истекающим пробным периодом: %w", database.MapError(err))
+	}
+	defer rows.Close()
+
+	var out []TrialCandidate
+	for rows.Next() {
+		var c TrialCandidate
+		if err := rows.Scan(&c.StoreID, &c.StoreName, &c.TrialEndsAt, &c.OwnerPhone, &c.OwnerLocale); err != nil {
+			return nil, fmt.Errorf("repository: чтение кандидата напоминания: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// ClaimTrialReminder помечает веху напоминания отправленной. Возвращает true,
+// если пометка поставлена сейчас (значит, напоминание ещё не отправляли).
+func (r *StoreRepository) ClaimTrialReminder(ctx context.Context, storeID int64, daysBefore int) (bool, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		INSERT INTO dbo.trial_reminders (store_id, days_before)
+		SELECT @store, @days
+		WHERE NOT EXISTS (SELECT 1 FROM dbo.trial_reminders WHERE store_id = @store AND days_before = @days);`
+	res, err := r.db.ExecContext(ctx, query, sql.Named("store", storeID), sql.Named("days", daysBefore))
+	if err != nil {
+		return false, fmt.Errorf("repository: пометка напоминания: %w", database.MapError(err))
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// ReleaseTrialReminder снимает пометку (если отправка не удалась) — напоминание
+// уйдёт при следующем сканировании.
+func (r *StoreRepository) ReleaseTrialReminder(ctx context.Context, storeID int64, daysBefore int) error {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `DELETE FROM dbo.trial_reminders WHERE store_id = @store AND days_before = @days;`
+	if _, err := r.db.ExecContext(ctx, query, sql.Named("store", storeID), sql.Named("days", daysBefore)); err != nil {
+		return fmt.Errorf("repository: снятие пометки напоминания: %w", database.MapError(err))
+	}
+	return nil
 }
 
 // StoreLocale возвращает язык по умолчанию и базовую валюту магазина.
