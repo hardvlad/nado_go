@@ -62,8 +62,10 @@ func (s StorefrontStore) Active() bool { return s.Status == StoreStatusActive }
 
 // MarketplaceOrder — заказ маркетплейса (зеркало Kaspi).
 type MarketplaceOrder struct {
+	ID            int64
 	ConnectionID  int64
 	StoreID       int64
+	StoreName     string // для отображения в списке (денормализация)
 	AccountID     int64
 	ExternalID    string
 	Code          string
@@ -74,6 +76,7 @@ type MarketplaceOrder struct {
 	CustomerName  string
 	CustomerPhone string
 	OrderedAt     time.Time
+	ImportedAt    time.Time
 	Raw           []byte
 }
 

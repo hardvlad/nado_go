@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -275,6 +277,58 @@ func (h *PageHandler) renderStoreEdit(w http.ResponseWriter, r *http.Request, st
 	action := i18n.Localize(h.localizer(r).Lang(), fmt.Sprintf("/stores/%d/edit", id))
 	data := h.page(r, "stores.edit_title").With("Form", form).With("Action", action)
 	return h.Render.Render(w, status, "store_edit", data)
+}
+
+const ordersPerPage = 30
+
+// OrdersList — GET /orders: список заказов маркетплейса продавца с поиском и
+// фильтром по магазину.
+func (h *PageHandler) OrdersList(w http.ResponseWriter, r *http.Request) error {
+	l := h.localizer(r)
+	p := tenant.FromContext(r.Context())
+	if p == nil {
+		redirect(w, r, i18n.Localize(l.Lang(), "/login")+"?next="+i18n.Localize(l.Lang(), "/orders"))
+		return nil
+	}
+
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	storeID, _ := strconv.ParseInt(r.URL.Query().Get("store"), 10, 64)
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+
+	orders, total, err := h.Connections.Orders(r.Context(), p.AccountID, storeID, query, page, ordersPerPage)
+	if err != nil {
+		return err
+	}
+	stores, err := h.Connections.Stores(r.Context(), p.AccountID)
+	if err != nil {
+		return err
+	}
+
+	totalPages := (total + ordersPerPage - 1) / ordersPerPage
+	nums := make([]int, 0, totalPages)
+	for i := 1; i <= totalPages; i++ {
+		nums = append(nums, i)
+	}
+	base := i18n.Localize(l.Lang(), "/orders") + "?q=" + url.QueryEscape(query)
+	if storeID > 0 {
+		base += "&store=" + strconv.FormatInt(storeID, 10)
+	}
+	base += "&page="
+
+	data := h.page(r, "orders.title").
+		With("Orders", orders).
+		With("Stores", stores).
+		With("Query", query).
+		With("StoreID", storeID).
+		With("Total", total).
+		With("Page", page).
+		With("TotalPages", totalPages).
+		With("PageNums", nums).
+		With("PageBase", base)
+	return h.Render.Render(w, http.StatusOK, "orders", data)
 }
 
 // cabinetID читает id онбординга из пути.

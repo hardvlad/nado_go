@@ -1,0 +1,69 @@
+{{/* Кабинет продавца: заказы, оформленные покупателями на витрине магазина. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "sorders.title" }}</h1>
+            <a class="btn btn--ghost btn--sm" href="{{ .Links.Account }}">{{ .L.T "sorders.to_account" }}</a>
+        </div>
+
+        <form class="orders-filter" method="get" action="{{ .Links.StoreOrders }}">
+            <input class="input" type="search" name="q" value="{{ .Query }}" placeholder="{{ .L.T `sorders.search_ph` }}" aria-label="{{ .L.T `sorders.search` }}">
+            <select class="input" name="store" aria-label="{{ .L.T `sorders.store` }}">
+                <option value="0">{{ .L.T "sorders.all_stores" }}</option>
+                {{ range .Stores }}<option value="{{ .ID }}"{{ if eq .ID $.StoreID }} selected{{ end }}>{{ .Name }}</option>{{ end }}
+            </select>
+            <select class="input" name="status" aria-label="{{ .L.T `sorders.status` }}">
+                <option value="">{{ .L.T "sorders.all_statuses" }}</option>
+                {{ range .Statuses }}<option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>{{ end }}
+            </select>
+            <button class="btn btn--primary" type="submit">{{ .L.T "sorders.search" }}</button>
+        </form>
+
+        {{ if .Orders }}
+        <p class="muted">{{ .L.T "sorders.count" "Count" .Total }}</p>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>{{ .L.T "sorders.col_number" }}</th>
+                        <th>{{ .L.T "sorders.col_store" }}</th>
+                        <th>{{ .L.T "sorders.col_customer" }}</th>
+                        <th>{{ .L.T "sorders.col_status" }}</th>
+                        <th>{{ .L.T "sorders.col_total" }}</th>
+                        <th>{{ .L.T "sorders.col_date" }}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Orders }}
+                    <tr>
+                        <td>№{{ .Number }}</td>
+                        <td>{{ .StoreName }}</td>
+                        <td>{{ .CustomerName }}{{ with .CustomerPhone }}<br><span class="muted small">{{ . }}</span>{{ end }}</td>
+                        <td><span class="badge badge--status">{{ $.L.T (printf "sorders.status_%s" .Status) }}</span></td>
+                        <td>{{ money .TotalMinor .Currency $.Lang }}</td>
+                        <td>{{ if .CreatedAt.IsZero }}—{{ else }}{{ formatDate "02.01.2006 15:04" .CreatedAt }}{{ end }}</td>
+                        <td><a class="btn btn--ghost btn--sm" href="{{ $.Links.StoreOrders }}/{{ .ID }}">{{ $.L.T "sorders.view" }}</a></td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+
+        {{ if gt .TotalPages 1 }}
+        <nav class="pagination">
+            {{ range .PageNums }}
+                {{ if eq . $.Page }}<span class="is-current">{{ . }}</span>{{ else }}<a href="{{ $.PageBase }}{{ . }}">{{ . }}</a>{{ end }}
+            {{ end }}
+        </nav>
+        {{ end }}
+
+        {{ else if or .Query .Status }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "sorders.nothing_found") }}
+        {{ else }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "sorders.empty") }}
+        {{ end }}
+    </div>
+</section>
+{{ end }}

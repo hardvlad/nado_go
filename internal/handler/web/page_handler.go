@@ -33,6 +33,7 @@ type Deps struct {
 	OTP         *service.OTPService
 	Connections *service.ConnectionService
 	Onboarding  *service.KaspiOnboardingService
+	StoreOrders *service.OrderService // заказы витрины (для кабинета продавца)
 	Feedback    *service.FeedbackService
 	// SecureCookies — cookie только по HTTPS и с префиксом __Host-.
 	// В проде обязательно, локально по http — выключено.
@@ -94,6 +95,13 @@ func (h *PageHandler) Routes() chi.Router {
 		r.Get("/stores/new", h.wrap(h.StoreConnectForm))
 		r.Get("/stores/{id}/edit", h.wrap(h.StoreEditForm))
 		r.Post("/stores/{id}/edit", h.wrap(h.StoreEditSubmit))
+		r.Get("/orders", h.wrap(h.OrdersList))
+	}
+
+	// Заказы, оформленные покупателями на витрине магазина (наша платформа).
+	if h.StoreOrders != nil {
+		r.Get("/store-orders", h.wrap(h.StoreOrdersList))
+		r.Get("/store-orders/{id}", h.wrap(h.StoreOrderDetail))
 	}
 
 	// Подключение через кабинет Kaspi (служебный сотрудник по SMS-коду владельца).
@@ -180,7 +188,8 @@ func (h *PageHandler) ensureLocalizer(r *http.Request) *http.Request {
 // Links — адреса страниц на текущем языке.
 type Links struct {
 	Home, Contact, Register, RegisterVerify, Login, Logout, Account string
-	Phone, PhoneVerify, StoreNew, KaspiCabinet                      string
+	Phone, PhoneVerify, StoreNew, KaspiCabinet, Orders              string
+	StoreOrders                                                     string
 }
 
 func linksFor(lang i18n.Lang) Links {
@@ -196,6 +205,8 @@ func linksFor(lang i18n.Lang) Links {
 		PhoneVerify:    i18n.Localize(lang, "/phone/verify"),
 		StoreNew:       i18n.Localize(lang, "/stores/new"),
 		KaspiCabinet:   i18n.Localize(lang, "/stores/kaspi"),
+		Orders:         i18n.Localize(lang, "/orders"),
+		StoreOrders:    i18n.Localize(lang, "/store-orders"),
 	}
 }
 

@@ -24,6 +24,17 @@ type Config struct {
 	Kaspi     Kaspi
 	Platform  Platform
 	Trial     Trial
+	Catalog   Catalog
+}
+
+// Catalog — регулярная переимпортация каталога и заказов из кабинетов/API.
+type Catalog struct {
+	// SyncInterval — как часто перезапускать импорт каталога для каждого
+	// подключения. 0 — регулярный импорт выключен (только по подключению/сохранению).
+	SyncInterval time.Duration
+	// OrdersSyncInterval — как часто импортировать заказы (официальный API).
+	// 0 — регулярный импорт заказов выключен.
+	OrdersSyncInterval time.Duration
 }
 
 // Trial — бесплатный пробный период магазина и напоминания об оплате.
@@ -202,6 +213,10 @@ func Load() (*Config, error) {
 		Trial: Trial{
 			Days:             envInt("TRIAL_DAYS", 14),
 			ReminderInterval: envDuration("TRIAL_REMINDER_INTERVAL", 6*time.Hour),
+		},
+		Catalog: Catalog{
+			SyncInterval:       time.Duration(envInt("KASPI_CATALOG_SYNC_INTERVAL", 21600)) * time.Second,
+			OrdersSyncInterval: time.Duration(envInt("KASPI_ORDERS_SYNC_INTERVAL", 900)) * time.Second,
 		},
 	}
 

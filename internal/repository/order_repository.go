@@ -164,6 +164,92 @@ func (r *OrderRepository) Create(ctx context.Context, in OrderInput) (*model.Ord
 	return order, nil
 }
 
+// CabinetOrderQuery — параметры выборки заказов витрины для кабинета продавца.
+type CabinetOrderQuery struct {
+	AccountID int64
+	StoreID   int64  // 0 — все магазины аккаунта
+	Search    string // по номеру, имени, телефону, e-mail покупателя
+	Status    string // "" — любой статус
+	Limit     int
+	Offset    int
+}
+
+// ListForAccount возвращает страницу заказов витрины аккаунта и общее число.
+// Изоляция арендатора: всегда фильтр по account_id.
+func (r *OrderRepository) ListForAccount(ctx context.Context, q CabinetOrderQuery) ([]model.Order, int, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT o.id, o.store_id, ISNULL(s.name, ''), o.number, o.status,
+		       ISNULL(o.customer_name, ''), ISNULL(o.customer_phone, ''), ISNULL(o.customer_email, ''),
+		       o.total_minor, o.currency, o.created_at,
+		       COUNT(*) OVER() AS total
+		FROM dbo.orders o
+		JOIN dbo.stores s ON s.id = o.store_id
+		WHERE o.account_id = @acc
+		  AND (@store = 0 OR o.store_id = @store)
+		  AND (@status = '' OR o.status = @status)
+		  AND (@q = '' OR CAST(o.number AS VARCHAR(20)) LIKE @like
+		       OR o.customer_name LIKE @like OR o.customer_phone LIKE @like OR o.customer_email LIKE @like)
+		ORDER BY o.id DESC
+		OFFSET @off ROWS FETCH NEXT @lim ROWS ONLY;`
+
+	rows, err := r.db.QueryContext(ctx, query,
+		sql.Named("acc", q.AccountID), sql.Named("store", q.StoreID), sql.Named("status", q.Status),
+		sql.Named("q", q.Search), sql.Named("like", "%"+escapeLike(q.Search)+"%"),
+		sql.Named("off", q.Offset), sql.Named("lim", q.Limit))
+	if err != nil {
+		return nil, 0, fmt.Errorf("repository: список заказов витрины: %w", database.MapError(err))
+	}
+	defer rows.Close()
+
+	var (
+		out   []model.Order
+		total int
+	)
+	for rows.Next() {
+		var o model.Order
+		if err := rows.Scan(&o.ID, &o.StoreID, &o.StoreName, &o.Number, &o.Status,
+			&o.CustomerName, &o.CustomerPhone, &o.CustomerEmail, &o.TotalMinor, &o.Currency, &o.CreatedAt, &total); err != nil {
+			return nil, 0, fmt.Errorf("repository: чтение заказа витрины: %w", err)
+		}
+		out = append(out, o)
+	}
+	return out, total, rows.Err()
+}
+
+// GetForAccount возвращает заказ витрины аккаунта с позициями (для кабинета).
+// В отличие от GetByNumber, доступ по владению аккаунтом, а не по токену.
+func (r *OrderRepository) GetForAccount(ctx context.Context, accountID, id int64) (*model.Order, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `
+		SELECT o.id, o.store_id, ISNULL(s.name, ''), o.number, o.status,
+		       ISNULL(o.customer_name, ''), ISNULL(o.customer_phone, ''), ISNULL(o.customer_email, ''),
+		       ISNULL(o.comment, ''), ISNULL(o.address_json, ''), o.subtotal_minor, o.total_minor,
+		       o.currency, o.lang, o.created_at
+		FROM dbo.orders o
+		JOIN dbo.stores s ON s.id = o.store_id
+		WHERE o.id = @id AND o.account_id = @acc;`
+	var o model.Order
+	err := r.db.QueryRowContext(ctx, query, sql.Named("id", id), sql.Named("acc", accountID)).
+		Scan(&o.ID, &o.StoreID, &o.StoreName, &o.Number, &o.Status, &o.CustomerName, &o.CustomerPhone,
+			&o.CustomerEmail, &o.Comment, &o.Address, &o.SubtotalMinor, &o.TotalMinor, &o.Currency, &o.Lang, &o.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository: заказ витрины %d: %w", id, database.MapError(err))
+	}
+	items, err := r.orderItems(ctx, o.ID)
+	if err != nil {
+		return nil, err
+	}
+	o.Items = items
+	return &o, nil
+}
+
 // GetByNumber возвращает заказ по номеру и токену (страница заказа защищена
 // токеном: номер угадывается). Нет совпадения — database.ErrNotFound.
 func (r *OrderRepository) GetByNumber(ctx context.Context, storeID, number int64, token string) (*model.Order, error) {

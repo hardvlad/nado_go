@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"nado_go/internal/money"
 )
 
 const (
@@ -235,6 +237,10 @@ func builtinFuncs() template.FuncMap {
 				m[key] = values[i+1]
 			}
 			return m, nil
+		},
+		// money форматирует сумму из минорных единиц с валютой на языке страницы.
+		"money": func(minor int64, currency, lang string) string {
+			return money.Money{Minor: minor, Currency: money.Currency(currency)}.Format(lang)
 		},
 		// safeHTML отключает экранирование. Применять только к доверенному
 		// содержимому — иначе это прямой путь к XSS.

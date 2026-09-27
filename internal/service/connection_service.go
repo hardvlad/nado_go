@@ -212,6 +212,86 @@ func (s *ConnectionService) UpdateKaspiStore(ctx context.Context, accountID, sto
 	return nil
 }
 
+// EnqueueCatalogSyncs ставит импорт каталога для всех активных подключений Kaspi
+// с сохранёнными реквизитами кабинета. Вызывается планировщиком по интервалу.
+// dedup_key (kaspi_sync_catalog:<id>) не даёт накапливать задачи: пока предыдущий
+// импорт в очереди или выполняется, повторная постановка игнорируется.
+func (s *ConnectionService) EnqueueCatalogSyncs(ctx context.Context) (int, error) {
+	targets, err := s.stores.CatalogSyncTargets(ctx)
+	if err != nil {
+		return 0, err
+	}
+	queued := 0
+	for _, t := range targets {
+		password, err := s.box.DecryptString(t.CabinetPasswordCipher)
+		if err != nil {
+			s.log.Warn("расписание: пароль кабинета нечитаем", slog.Int64("connection_id", t.ConnectionID), slog.Any("error", err))
+			continue
+		}
+		if _, err := s.jobs.Enqueue(ctx, jobs.Enqueue{
+			Kind:      jobs.KindKaspiSyncCatalog,
+			Execution: jobs.Remote,
+			AccountID: t.AccountID,
+			Payload: map[string]any{
+				"connection_id":     t.ConnectionID,
+				"login":             t.CabinetLogin,
+				"password":          password,
+				"selected_merchant": t.MerchantUID,
+			},
+			DedupKey: fmt.Sprintf("kaspi_sync_catalog:%d", t.ConnectionID),
+		}); err != nil {
+			s.log.Warn("расписание: не удалось поставить импорт каталога", slog.Int64("connection_id", t.ConnectionID), slog.Any("error", err))
+			continue
+		}
+		queued++
+	}
+	return queued, nil
+}
+
+// EnqueueOrdersSyncs ставит импорт заказов для всех активных подключений Kaspi
+// (официальный API). Вызывается планировщиком по интервалу; dedup_key
+// (kaspi_orders:<id>) не даёт задачам накапливаться.
+func (s *ConnectionService) EnqueueOrdersSyncs(ctx context.Context) (int, error) {
+	targets, err := s.stores.OrdersSyncTargets(ctx)
+	if err != nil {
+		return 0, err
+	}
+	queued := 0
+	for _, t := range targets {
+		if _, err := s.jobs.Enqueue(ctx, jobs.Enqueue{
+			Kind:      jobs.KindKaspiImportOrders,
+			Execution: jobs.Local,
+			AccountID: t.AccountID,
+			Payload:   map[string]any{"connection_id": t.ConnectionID},
+			DedupKey:  fmt.Sprintf("kaspi_orders:%d", t.ConnectionID),
+		}); err != nil {
+			s.log.Warn("расписание: не удалось поставить импорт заказов", slog.Int64("connection_id", t.ConnectionID), slog.Any("error", err))
+			continue
+		}
+		queued++
+	}
+	return queued, nil
+}
+
+// Orders возвращает страницу заказов аккаунта для кабинета (с поиском и фильтром
+// по магазину). page с 1; perPage ограничивается.
+func (s *ConnectionService) Orders(ctx context.Context, accountID, storeID int64, search string, page, perPage int) ([]model.MarketplaceOrder, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage <= 0 || perPage > 100 {
+		perPage = 30
+	}
+	orders, total, err := s.orders.List(ctx, repository.OrderQuery{
+		AccountID: accountID, StoreID: storeID, Search: search,
+		Limit: perPage, Offset: (page - 1) * perPage,
+	})
+	if err != nil {
+		return nil, 0, httpx.ErrInternal(err)
+	}
+	return orders, total, nil
+}
+
 // ImportKaspiOrders — тело фоновой задачи kaspi.import_orders.
 func (s *ConnectionService) ImportKaspiOrders(ctx context.Context, connectionID int64) (created, updated int, err error) {
 	conn, err := s.stores.GetConnectionForSync(ctx, connectionID)

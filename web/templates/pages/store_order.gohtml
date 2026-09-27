@@ -1,0 +1,59 @@
+{{/* Кабинет продавца: детали заказа витрины. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--narrow">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "sorders.detail_title" }} №{{ .Order.Number }}</h1>
+            <a class="btn btn--ghost btn--sm" href="{{ .Links.StoreOrders }}">{{ .L.T "sorders.back_to_list" }}</a>
+        </div>
+
+        <div class="card">
+            <dl class="props">
+                <dt>{{ .L.T "sorders.f_store" }}</dt><dd>{{ .Order.StoreName }}</dd>
+                <dt>{{ .L.T "sorders.f_status" }}</dt><dd><span class="badge badge--status">{{ .StatusLabel }}</span></dd>
+                <dt>{{ .L.T "sorders.f_date" }}</dt><dd>{{ if .Order.CreatedAt.IsZero }}—{{ else }}{{ formatDate "02.01.2006 15:04" .Order.CreatedAt }}{{ end }}</dd>
+                <dt>{{ .L.T "sorders.f_customer" }}</dt><dd>{{ .Order.CustomerName }}</dd>
+                {{ with .Order.CustomerPhone }}<dt>{{ $.L.T "sorders.f_phone" }}</dt><dd>{{ . }}</dd>{{ end }}
+                {{ with .Order.CustomerEmail }}<dt>{{ $.L.T "sorders.f_email" }}</dt><dd>{{ . }}</dd>{{ end }}
+                {{ with .AddressText }}<dt>{{ $.L.T "sorders.f_address" }}</dt><dd>{{ . }}</dd>{{ end }}
+                {{ with .Order.Comment }}<dt>{{ $.L.T "sorders.f_comment" }}</dt><dd>{{ . }}</dd>{{ end }}
+            </dl>
+        </div>
+
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>{{ .L.T "sorders.col_item" }}</th>
+                        <th>{{ .L.T "sorders.col_sku" }}</th>
+                        <th>{{ .L.T "sorders.col_price" }}</th>
+                        <th>{{ .L.T "sorders.col_qty" }}</th>
+                        <th>{{ .L.T "sorders.col_sum" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Order.Items }}
+                    <tr>
+                        <td>{{ .Title }}</td>
+                        <td>{{ .SKU }}</td>
+                        <td>{{ money .PriceMinor $.Order.Currency $.Lang }}</td>
+                        <td>{{ .Qty }}</td>
+                        <td>{{ money .LineMinor $.Order.Currency $.Lang }}</td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="4">{{ .L.T "sorders.subtotal" }}</th>
+                        <td>{{ money .Order.SubtotalMinor .Order.Currency .Lang }}</td>
+                    </tr>
+                    <tr>
+                        <th colspan="4">{{ .L.T "sorders.total" }}</th>
+                        <td><strong>{{ money .Order.TotalMinor .Order.Currency .Lang }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</section>
+{{ end }}

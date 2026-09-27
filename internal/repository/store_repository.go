@@ -244,6 +244,82 @@ func (r *StoreRepository) ResolveByHost(ctx context.Context, host string) (*mode
 	return scanStorefront(r.db.QueryRowContext(ctx, query, sql.Named("host", host)))
 }
 
+// CatalogSyncTarget — активное подключение Kaspi с реквизитами кабинета для
+// регулярного импорта каталога.
+type CatalogSyncTarget struct {
+	ConnectionID          int64
+	AccountID             int64
+	CabinetLogin          string
+	CabinetPasswordCipher []byte
+	MerchantUID           string
+}
+
+// OrdersSyncTarget — активное подключение Kaspi для регулярного импорта заказов
+// по официальному API (нужен только токен подключения).
+type OrdersSyncTarget struct {
+	ConnectionID int64
+	AccountID    int64
+}
+
+// OrdersSyncTargets возвращает активные подключения Kaspi активных магазинов —
+// их заказы можно импортировать по расписанию (официальным API).
+func (r *StoreRepository) OrdersSyncTargets(ctx context.Context) ([]OrdersSyncTarget, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT c.id, c.account_id
+		FROM dbo.marketplace_connections c
+		JOIN dbo.stores s ON s.id = c.store_id
+		WHERE c.status = 'active' AND s.status = 'active' AND c.marketplace = 'kaspi';`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("repository: подключения для импорта заказов: %w", database.MapError(err))
+	}
+	defer rows.Close()
+
+	var out []OrdersSyncTarget
+	for rows.Next() {
+		var t OrdersSyncTarget
+		if err := rows.Scan(&t.ConnectionID, &t.AccountID); err != nil {
+			return nil, fmt.Errorf("repository: чтение подключения для заказов: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// CatalogSyncTargets возвращает активные подключения Kaspi у активных магазинов,
+// у которых сохранены реквизиты кабинета (логин + пароль) — их каталог можно
+// импортировать повторно по расписанию.
+func (r *StoreRepository) CatalogSyncTargets(ctx context.Context) ([]CatalogSyncTarget, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT c.id, c.account_id, ISNULL(c.cabinet_login, ''), c.cabinet_password_ciphertext, ISNULL(c.merchant_uid, '')
+		FROM dbo.marketplace_connections c
+		JOIN dbo.stores s ON s.id = c.store_id
+		WHERE c.status = 'active' AND s.status = 'active' AND c.marketplace = 'kaspi'
+		  AND c.cabinet_login IS NOT NULL AND c.cabinet_login <> ''
+		  AND c.cabinet_password_ciphertext IS NOT NULL;`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("repository: подключения для импорта каталога: %w", database.MapError(err))
+	}
+	defer rows.Close()
+
+	var out []CatalogSyncTarget
+	for rows.Next() {
+		var t CatalogSyncTarget
+		if err := rows.Scan(&t.ConnectionID, &t.AccountID, &t.CabinetLogin, &t.CabinetPasswordCipher, &t.MerchantUID); err != nil {
+			return nil, fmt.Errorf("repository: чтение подключения для импорта: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 // TrialCandidate — магазин с пробным периодом и контактом владельца для
 // напоминаний об оплате.
 type TrialCandidate struct {

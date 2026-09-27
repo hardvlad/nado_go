@@ -13,7 +13,11 @@
             <div class="dashboard__main">
                 <div class="section-head section-head--row">
                     <h2 class="aside-card__title">{{ .L.T "account.stores_title" }}</h2>
-                    <a class="btn btn--primary btn--sm" href="{{ .Links.StoreNew }}">{{ template "icon" "plug" }}{{ .L.T "account.store_add" }}</a>
+                    <span class="section-head__actions">
+                        <a class="btn btn--ghost btn--sm" href="{{ .Links.StoreOrders }}">{{ .L.T "account.store_orders_link" }}</a>
+                        <a class="btn btn--ghost btn--sm" href="{{ .Links.Orders }}">{{ .L.T "account.orders_link" }}</a>
+                        <a class="btn btn--primary btn--sm" href="{{ .Links.StoreNew }}">{{ template "icon" "plug" }}{{ .L.T "account.store_add" }}</a>
+                    </span>
                 </div>
 
                 {{ if .Stores }}

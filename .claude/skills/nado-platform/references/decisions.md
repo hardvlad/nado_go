@@ -621,3 +621,57 @@ nado-go-conventions (`references/jobs-queue.md`).
   отдаёт trial_ends_at).
 - **Не переносили из PHP** (специфика ProfitBot, нет в модели nado): tax%,
   маркетинговый кабинет, склады в форме магазина.
+
+## D-36. Регулярный импорт каталога Kaspi по расписанию
+**Дата:** 2026-09-27 · **Источник:** требование обновлять каталог регулярно
+
+- Планировщик в `app` (тикер, как у напоминаний и почты) с интервалом
+  `KASPI_CATALOG_SYNC_INTERVAL` (в секундах; по умолчанию 21600 = 6 ч; 0 —
+  выключить). Первый прогон сразу при старте, далее по интервалу.
+- `ConnectionService.EnqueueCatalogSyncs` берёт активные подключения Kaspi с
+  сохранёнными реквизитами кабинета (`StoreRepository.CatalogSyncTargets`),
+  расшифровывает пароль и ставит `kaspi.sync_catalog` с dedup_key
+  `kaspi_sync_catalog:<connID>` — пока предыдущий импорт в очереди/выполняется,
+  повторная постановка игнорируется (задачи не копятся).
+- Реквизиты кабинета берутся с подключения (cabinet_login/…_ciphertext/merchant_uid,
+  D-35), поэтому регулярный импорт работает без участия продавца.
+
+## D-37. Автоимпорт заказов Kaspi по расписанию + список заказов в кабинете
+**Дата:** 2026-09-27 · **Источник:** требование регулярно тянуть заказы и смотреть их в кабинете
+
+- **Импорт заказов идёт по официальному Shop API** (D-25, official.go), не через
+  кабинет: это уже реализованный и более надёжный путь. KaspiImport.php (кабинетные
+  заказы) как источник не понадобился.
+- **Планировщик заказов:** тикер в `app` (как у каталога, D-36) с интервалом
+  `KASPI_ORDERS_SYNC_INTERVAL` (секунды; по умолчанию 900 = 15 мин; 0 — выключить).
+  `ConnectionService.EnqueueOrdersSyncs` берёт активные подключения Kaspi
+  (`StoreRepository.OrdersSyncTargets`) и ставит локальную задачу
+  `kaspi.import_orders` с dedup_key `kaspi_orders:<id>` (не копятся). Тело задачи —
+  прежний `ImportKaspiOrders` (зеркалит в marketplace_orders).
+- **Кабинет продавца:** страница `/orders` (`OrdersList`) — список заказов аккаунта
+  с поиском (по номеру/имени/телефону) и фильтром по магазину, пагинация.
+  `MarketplaceOrderRepository.List` (изоляция по account_id),
+  `ConnectionService.Orders`. Ссылка «Заказы» на странице `/account`. Формат сумм —
+  новая функция шаблона `money` в internal/view.
+
+## D-38. Список заказов витрины в кабинете продавца
+**Дата:** 2026-09-27 · **Источник:** требование смотреть заказы, оформленные покупателями в магазине на нашей платформе
+
+- **Отдельная поверхность от заказов Kaspi (D-37).** «Заказы Kaspi» (`/orders`,
+  таблица `marketplace_orders`) — это зеркало маркетплейса; здесь речь о заказах,
+  которые покупатели оформили на **нашей** витрине (таблица `orders`, D-30).
+  Поэтому новые страницы `/store-orders` и `/store-orders/{id}`, а ссылка в кабинете
+  переименована: «Заказы Kaspi» + новая «Заказы магазина».
+- **Репозиторий (изоляция по account_id):** `OrderRepository.ListForAccount`
+  (`CabinetOrderQuery`: поиск по номеру/имени/телефону/email через `escapeLike`,
+  фильтр по магазину и статусу, `COUNT(*) OVER()`, OFFSET/FETCH, JOIN stores для
+  имени) и `GetForAccount` (заказ + позиции, `sql.ErrNoRows → database.ErrNotFound`).
+- **Сервис:** `OrderService.CabinetOrders` (page≥1, perPage cap 100/def 30) и
+  `CabinetOrder` (`database.ErrNotFound → ErrOrderNotFound`). Проброшен в web через
+  `Deps.StoreOrders` (тот же экземпляр, что и витрина, — переиспользован в app.go).
+- **Хендлеры/шаблоны:** `StoreOrdersList`/`StoreOrderDetail` в
+  handler/web/store_orders.go; статусы заказа локализуются ключами
+  `sorders.status_<status>` (список статусов задан в коде, невалидный статус в
+  фильтре игнорируется). Адрес показывается из JSON `{"text": ...}` (как пишет
+  checkout). Шаблоны `store_orders.gohtml`/`store_order.gohtml`, класс
+  `.badge--status` на токенах info. i18n-ключи `sorders.*` в ru/kk/en.

@@ -65,6 +65,66 @@ func (r *MarketplaceOrderRepository) Upsert(ctx context.Context, o *model.Market
 	return action == "INSERT", nil
 }
 
+// OrderQuery — параметры выборки заказов для кабинета.
+type OrderQuery struct {
+	AccountID int64
+	StoreID   int64  // 0 — все магазины аккаунта
+	Search    string // по коду заказа, имени и телефону покупателя
+	Limit     int
+	Offset    int
+}
+
+// List возвращает страницу заказов аккаунта и общее число подходящих.
+// Изоляция арендатора: всегда фильтр по account_id.
+func (r *MarketplaceOrderRepository) List(ctx context.Context, q OrderQuery) ([]model.MarketplaceOrder, int, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT o.id, o.store_id, ISNULL(s.name, ''), o.external_id, ISNULL(o.code, ''),
+		       ISNULL(o.state, ''), ISNULL(o.status, ''), ISNULL(o.total_minor, 0), o.currency,
+		       ISNULL(o.customer_name, ''), ISNULL(o.customer_phone, ''), o.ordered_at, o.imported_at,
+		       COUNT(*) OVER() AS total
+		FROM dbo.marketplace_orders o
+		JOIN dbo.stores s ON s.id = o.store_id
+		WHERE o.account_id = @acc
+		  AND (@store = 0 OR o.store_id = @store)
+		  AND (@q = '' OR o.code LIKE @like OR o.customer_name LIKE @like OR o.customer_phone LIKE @like)
+		ORDER BY o.ordered_at DESC, o.id DESC
+		OFFSET @off ROWS FETCH NEXT @lim ROWS ONLY;`
+
+	rows, err := r.db.QueryContext(ctx, query,
+		sql.Named("acc", q.AccountID), sql.Named("store", q.StoreID),
+		sql.Named("q", q.Search), sql.Named("like", "%"+escapeLike(q.Search)+"%"),
+		sql.Named("off", q.Offset), sql.Named("lim", q.Limit))
+	if err != nil {
+		return nil, 0, fmt.Errorf("repository: список заказов: %w", database.MapError(err))
+	}
+	defer rows.Close()
+
+	var (
+		out   []model.MarketplaceOrder
+		total int
+	)
+	for rows.Next() {
+		var (
+			o        model.MarketplaceOrder
+			ordered  sql.NullTime
+			imported sql.NullTime
+		)
+		o.AccountID = q.AccountID
+		if err := rows.Scan(&o.ID, &o.StoreID, &o.StoreName, &o.ExternalID, &o.Code,
+			&o.State, &o.Status, &o.TotalMinor, &o.Currency, &o.CustomerName, &o.CustomerPhone,
+			&ordered, &imported, &total); err != nil {
+			return nil, 0, fmt.Errorf("repository: чтение заказа: %w", err)
+		}
+		o.OrderedAt = ordered.Time
+		o.ImportedAt = imported.Time
+		out = append(out, o)
+	}
+	return out, total, rows.Err()
+}
+
 func nullTime(t time.Time) sql.NullTime {
 	if t.IsZero() {
 		return sql.NullTime{}

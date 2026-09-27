@@ -48,6 +48,7 @@ type App struct {
 	runner  *jobs.Runner                  // встроенный воркер локальных задач
 	mailbox *mailbox.Poller               // опрос почтового ящика служебных сотрудников (может быть nil)
 	trial   *service.TrialReminderService // напоминания об оплате перед концом пробного периода
+	conn    *service.ConnectionService    // для регулярного импорта каталога по расписанию
 
 	// runnerDone закрывается, когда встроенный воркер завершил текущую задачу.
 	// Ждём его перед закрытием БД, иначе задача оборвётся на запросе к базе.
@@ -56,6 +57,10 @@ type App struct {
 	mailboxDone chan struct{}
 	// trialDone закрывается, когда планировщик напоминаний остановлен.
 	trialDone chan struct{}
+	// catalogDone закрывается, когда планировщик импорта каталога остановлен.
+	catalogDone chan struct{}
+	// ordersDone закрывается, когда планировщик импорта заказов остановлен.
+	ordersDone chan struct{}
 }
 
 // New загружает конфигурацию и создаёт все компоненты.
@@ -204,6 +209,10 @@ func New(ctx context.Context, version string) (*App, error) {
 
 	health := api.NewHealthHandler(version, map[string]api.Pinger{"database": db})
 
+	// Заказы витрины: один сервис и для публичной части (checkout), и для кабинета.
+	cartRepo := repository.NewCartRepository(db)
+	orderService := service.NewOrderService(repository.NewOrderRepository(db), cartRepo)
+
 	pages := web.NewPageHandler(web.Deps{
 		Render:        renderer,
 		I18n:          bundle,
@@ -212,6 +221,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		OTP:           otpService,
 		Connections:   connService,
 		Onboarding:    onboardingService,
+		StoreOrders:   orderService,
 		Feedback:      feedbackService,
 		SecureCookies: cfg.IsProduction(),
 		PublicURL:     cfg.App.PublicURL,
@@ -235,13 +245,12 @@ func New(ctx context.Context, version string) (*App, error) {
 	customerAuth := service.NewCustomerAuthService(
 		repository.NewCustomerRepository(db), box, sender, codeMessage, !cfg.IsProduction(), log)
 
-	cartRepo := repository.NewCartRepository(db)
 	shopHandler := shop.New(shop.Deps{
 		Stores:      repository.NewStoreRepository(db),
 		Catalog:     service.NewStorefrontService(repository.NewCatalogRepository(db)),
 		Customers:   customerAuth,
 		Cart:        service.NewCartService(cartRepo),
-		Orders:      service.NewOrderService(repository.NewOrderRepository(db), cartRepo),
+		Orders:      orderService,
 		Render:      themeRenderer,
 		ThemeStatic: themesFS,
 		I18n:        bundle,
@@ -283,7 +292,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		repository.NewStoreRepository(db), sender, bundle, cfg.App.PublicURL, log)
 
 	return &App{cfg: cfg, log: log, db: db, server: server, health: health,
-		runner: runner, mailbox: mailboxPoller, trial: trialReminders}, nil
+		runner: runner, mailbox: mailboxPoller, trial: trialReminders, conn: connService}, nil
 }
 
 // Run обслуживает запросы до отмены ctx, затем выполняет безопасное завершение.
@@ -318,6 +327,24 @@ func (a *App) Run(ctx context.Context) error {
 		go func() {
 			defer close(a.trialDone)
 			a.runTrialReminders(ctx)
+		}()
+	}
+
+	// Планировщик регулярного импорта каталога Kaspi (если задан интервал).
+	if a.conn != nil && a.cfg.Catalog.SyncInterval > 0 {
+		a.catalogDone = make(chan struct{})
+		go func() {
+			defer close(a.catalogDone)
+			a.runCatalogSyncs(ctx)
+		}()
+	}
+
+	// Планировщик регулярного импорта заказов Kaspi (если задан интервал).
+	if a.conn != nil && a.cfg.Catalog.OrdersSyncInterval > 0 {
+		a.ordersDone = make(chan struct{})
+		go func() {
+			defer close(a.ordersDone)
+			a.runOrdersSyncs(ctx)
 		}()
 	}
 
@@ -433,8 +460,66 @@ func (a *App) closeResources() {
 			a.log.Warn("планировщик напоминаний не завершился в отведённое время")
 		}
 	}
+	// И планировщика импорта каталога (ходит в БД).
+	if a.catalogDone != nil {
+		select {
+		case <-a.catalogDone:
+		case <-time.After(a.cfg.HTTP.ShutdownTimeout):
+			a.log.Warn("планировщик импорта каталога не завершился в отведённое время")
+		}
+	}
+	// И планировщика импорта заказов.
+	if a.ordersDone != nil {
+		select {
+		case <-a.ordersDone:
+		case <-time.After(a.cfg.HTTP.ShutdownTimeout):
+			a.log.Warn("планировщик импорта заказов не завершился в отведённое время")
+		}
+	}
 	if err := a.db.Close(); err != nil {
 		a.log.Error("ошибка закрытия пула БД", slog.Any("error", err))
+	}
+}
+
+// runCatalogSyncs периодически ставит импорт каталога для всех активных
+// подключений Kaspi. Первый прогон — сразу при старте; далее с интервалом из
+// конфигурации (KASPI_CATALOG_SYNC_INTERVAL).
+func (a *App) runCatalogSyncs(ctx context.Context) {
+	t := time.NewTicker(a.cfg.Catalog.SyncInterval)
+	defer t.Stop()
+	for {
+		n, err := a.conn.EnqueueCatalogSyncs(ctx)
+		if err != nil && ctx.Err() == nil {
+			a.log.Warn("импорт каталога: постановка по расписанию", slog.Any("error", err))
+		} else if n > 0 {
+			a.log.Info("импорт каталога поставлен по расписанию", slog.Int("connections", n))
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// runOrdersSyncs периодически ставит импорт заказов для всех активных
+// подключений Kaspi. Первый прогон — сразу при старте; далее по интервалу
+// (KASPI_ORDERS_SYNC_INTERVAL).
+func (a *App) runOrdersSyncs(ctx context.Context) {
+	t := time.NewTicker(a.cfg.Catalog.OrdersSyncInterval)
+	defer t.Stop()
+	for {
+		n, err := a.conn.EnqueueOrdersSyncs(ctx)
+		if err != nil && ctx.Err() == nil {
+			a.log.Warn("импорт заказов: постановка по расписанию", slog.Any("error", err))
+		} else if n > 0 {
+			a.log.Info("импорт заказов поставлен по расписанию", slog.Int("connections", n))
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
 	}
 }
 

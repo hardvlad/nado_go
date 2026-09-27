@@ -33,6 +33,7 @@ type Cart struct {
 type Order struct {
 	ID            int64
 	StoreID       int64
+	StoreName     string // для списка в кабинете (денормализация)
 	Number        int64
 	Token         string
 	Status        string

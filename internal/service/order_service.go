@@ -98,6 +98,37 @@ func (s *OrderService) Order(ctx context.Context, storeID, number int64, token s
 	return o, nil
 }
 
+// CabinetOrders возвращает страницу заказов витрины для кабинета продавца
+// (поиск, фильтр по магазину и статусу). page с 1; perPage ограничивается.
+func (s *OrderService) CabinetOrders(ctx context.Context, accountID, storeID int64, search, status string, page, perPage int) ([]model.Order, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage <= 0 || perPage > 100 {
+		perPage = 30
+	}
+	orders, total, err := s.orders.ListForAccount(ctx, repository.CabinetOrderQuery{
+		AccountID: accountID, StoreID: storeID, Search: search, Status: status,
+		Limit: perPage, Offset: (page - 1) * perPage,
+	})
+	if err != nil {
+		return nil, 0, httpx.ErrInternal(err)
+	}
+	return orders, total, nil
+}
+
+// CabinetOrder возвращает заказ витрины аккаунта с позициями (детали в кабинете).
+func (s *OrderService) CabinetOrder(ctx context.Context, accountID, id int64) (*model.Order, error) {
+	o, err := s.orders.GetForAccount(ctx, accountID, id)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, ErrOrderNotFound
+	}
+	if err != nil {
+		return nil, httpx.ErrInternal(err)
+	}
+	return o, nil
+}
+
 // CustomerOrders возвращает заказы покупателя для кабинета.
 func (s *OrderService) CustomerOrders(ctx context.Context, storeID, customerID int64) ([]model.Order, error) {
 	orders, err := s.orders.ListByCustomer(ctx, storeID, customerID)

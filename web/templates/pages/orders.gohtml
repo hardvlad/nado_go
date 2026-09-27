@@ -1,0 +1,63 @@
+{{/* Кабинет продавца: заказы из маркетплейса (зеркало Kaspi) с поиском и фильтром. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "orders.title" }}</h1>
+            <a class="btn btn--ghost btn--sm" href="{{ .Links.Account }}">{{ .L.T "orders.to_account" }}</a>
+        </div>
+
+        <form class="orders-filter" method="get" action="{{ .Links.Orders }}">
+            <input class="input" type="search" name="q" value="{{ .Query }}" placeholder="{{ .L.T `orders.search_ph` }}" aria-label="{{ .L.T `orders.search` }}">
+            <select class="input" name="store" aria-label="{{ .L.T `orders.store` }}">
+                <option value="0">{{ .L.T "orders.all_stores" }}</option>
+                {{ range .Stores }}<option value="{{ .ID }}"{{ if eq .ID $.StoreID }} selected{{ end }}>{{ .Name }}</option>{{ end }}
+            </select>
+            <button class="btn btn--primary" type="submit">{{ .L.T "orders.search" }}</button>
+        </form>
+
+        {{ if .Orders }}
+        <p class="muted">{{ .L.T "orders.count" "Count" .Total }}</p>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>{{ .L.T "orders.col_code" }}</th>
+                        <th>{{ .L.T "orders.col_store" }}</th>
+                        <th>{{ .L.T "orders.col_customer" }}</th>
+                        <th>{{ .L.T "orders.col_status" }}</th>
+                        <th>{{ .L.T "orders.col_total" }}</th>
+                        <th>{{ .L.T "orders.col_date" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Orders }}
+                    <tr>
+                        <td>{{ with .Code }}{{ . }}{{ else }}{{ .ExternalID }}{{ end }}</td>
+                        <td>{{ .StoreName }}</td>
+                        <td>{{ .CustomerName }}{{ with .CustomerPhone }}<br><span class="muted small">{{ . }}</span>{{ end }}</td>
+                        <td>{{ .Status }}{{ with .State }}<br><span class="muted small">{{ . }}</span>{{ end }}</td>
+                        <td>{{ money .TotalMinor .Currency $.Lang }}</td>
+                        <td>{{ if .OrderedAt.IsZero }}—{{ else }}{{ formatDate "02.01.2006 15:04" .OrderedAt }}{{ end }}</td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+
+        {{ if gt .TotalPages 1 }}
+        <nav class="pagination">
+            {{ range .PageNums }}
+                {{ if eq . $.Page }}<span class="is-current">{{ . }}</span>{{ else }}<a href="{{ $.PageBase }}{{ . }}">{{ . }}</a>{{ end }}
+            {{ end }}
+        </nav>
+        {{ end }}
+
+        {{ else if .Query }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "orders.nothing_found") }}
+        {{ else }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "orders.empty") }}
+        {{ end }}
+    </div>
+</section>
+{{ end }}
