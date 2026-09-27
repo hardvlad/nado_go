@@ -41,6 +41,7 @@ type CustomerAuthService struct {
 	box     *secrets.Box
 	sender  messaging.Sender
 	message CodeMessage
+	devMode bool // вне прода код печатается в лог, если WhatsApp недоступен
 	log     *slog.Logger
 	now     func() time.Time
 
@@ -48,9 +49,9 @@ type CustomerAuthService struct {
 	byIP    *httpx.RateLimiter
 }
 
-func NewCustomerAuthService(repo *repository.CustomerRepository, box *secrets.Box, sender messaging.Sender, msg CodeMessage, log *slog.Logger) *CustomerAuthService {
+func NewCustomerAuthService(repo *repository.CustomerRepository, box *secrets.Box, sender messaging.Sender, msg CodeMessage, devMode bool, log *slog.Logger) *CustomerAuthService {
 	return &CustomerAuthService{
-		repo: repo, box: box, sender: sender, message: msg, log: log, now: time.Now,
+		repo: repo, box: box, sender: sender, message: msg, devMode: devMode, log: log, now: time.Now,
 		byPhone: httpx.NewRateLimiter(5, time.Hour),
 		byIP:    httpx.NewRateLimiter(30, time.Hour),
 	}
@@ -81,11 +82,16 @@ func (s *CustomerAuthService) RequestCode(ctx context.Context, storeID int64, ra
 	}
 
 	if _, err := s.sender.Send(ctx, messaging.Message{Phone: phone, Text: s.message(code, lang)}); err != nil {
-		s.log.Error("customer: отправка кода", slog.Any("error", err))
-		return phone, ErrCustomerSend
+		if !s.devMode {
+			s.log.Error("customer: отправка кода", slog.Any("error", err))
+			return phone, ErrCustomerSend
+		}
+		// Режим разработки: WhatsApp недоступен — печатаем код в лог и продолжаем.
+		s.log.Warn("customer: код НЕ отправлен (нет WhatsApp); режим разработки — используйте код из лога",
+			slog.String("phone", phone), slog.String("code", code), slog.Any("send_error", err))
 	}
 
-	// Сохраняем только после успешной отправки.
+	// Сохраняем код (в проде — только после успешной отправки; в dev — всегда).
 	if err := s.repo.CreateChallenge(ctx, &model.OTPChallenge{
 		StoreID: storeID, PhoneE164: phone, Channel: "whatsapp",
 		CodeHash: s.box.HMAC(code), MaxAttempts: customerMaxAttempts,

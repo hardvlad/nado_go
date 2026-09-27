@@ -241,14 +241,16 @@ func (r *CatalogRepository) BuildProduct(ctx context.Context, in BuildProductInp
 		if in.Available {
 			visible = 1
 		}
+		// В MERGE у MSSQL допустима лишь одна ветка WHEN MATCHED с UPDATE, поэтому
+		// разницу между ручной и правило-ценой выражаем через CASE: ручную цену и
+		// её правило не трогаем, у правило-цены обновляем из расчёта.
 		const mergeOffer = `
 			MERGE dbo.store_offers WITH (HOLDLOCK) AS t
 			USING (SELECT @store AS store_id, @vid AS variant_id) AS s
 			ON t.store_id = s.store_id AND t.variant_id = s.variant_id
-			WHEN MATCHED AND t.price_mode = 'rule' THEN UPDATE SET
-				price_minor = @price, old_price_minor = @old, currency = @cur, is_visible = @vis,
-				applied_rule_id = @rule, computed_at = SYSUTCDATETIME()
-			WHEN MATCHED AND t.price_mode = 'manual' THEN UPDATE SET
+			WHEN MATCHED THEN UPDATE SET
+				price_minor = CASE WHEN t.price_mode = 'manual' THEN t.price_minor ELSE @price END,
+				applied_rule_id = CASE WHEN t.price_mode = 'manual' THEN t.applied_rule_id ELSE @rule END,
 				old_price_minor = @old, currency = @cur, is_visible = @vis, computed_at = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (store_id, variant_id, price_minor, old_price_minor, currency, is_visible, price_mode, applied_rule_id)
 				VALUES (@store, @vid, @price, @old, @cur, @vis, 'rule', @rule);`

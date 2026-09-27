@@ -94,7 +94,7 @@ func newOTP(t *testing.T, sender messaging.Sender) (*OTPService, *fakeOTPStore) 
 	store := &fakeOTPStore{}
 	// Текст = код: так тест узнаёт сгенерированный код.
 	svc := NewOTPService(store, box, sender, func(code, _ string) string { return code },
-		5*time.Minute, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		5*time.Minute, false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	return svc, store
 }
 

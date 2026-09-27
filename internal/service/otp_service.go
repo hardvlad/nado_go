@@ -53,6 +53,10 @@ type OTPService struct {
 	sender  messaging.Sender
 	message CodeMessage
 	ttl     time.Duration
+	// devMode: вне прода, если код не удалось отправить (нет активного инстанса
+	// WhatsApp), код печатается в лог и вход/регистрация продолжаются. В проде
+	// такого послабления нет — код обязан уйти сообщением.
+	devMode bool
 	log     *slog.Logger
 	now     func() time.Time
 
@@ -60,7 +64,7 @@ type OTPService struct {
 	byIP    *httpx.RateLimiter
 }
 
-func NewOTPService(store OTPStore, box *secrets.Box, sender messaging.Sender, msg CodeMessage, ttl time.Duration, log *slog.Logger) *OTPService {
+func NewOTPService(store OTPStore, box *secrets.Box, sender messaging.Sender, msg CodeMessage, ttl time.Duration, devMode bool, log *slog.Logger) *OTPService {
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
 	}
@@ -70,6 +74,7 @@ func NewOTPService(store OTPStore, box *secrets.Box, sender messaging.Sender, ms
 		sender:  sender,
 		message: msg,
 		ttl:     ttl,
+		devMode: devMode,
 		log:     log,
 		now:     time.Now,
 		byPhone: httpx.NewRateLimiter(5, time.Hour),  // до 5 кодов на номер в час
@@ -105,6 +110,20 @@ func (s *OTPService) Request(ctx context.Context, rawPhone, purpose, lang, ip st
 	}
 
 	sent, sendErr := s.sender.Send(ctx, messaging.Message{Phone: phone, Text: s.message(code, lang)})
+	if sendErr != nil {
+		// В проде не отправленный код — ошибка: иначе пользователь увидит
+		// «отправлено», но кода у него не будет.
+		if !s.devMode {
+			s.log.Error("otp: отправка кода", slog.String("purpose", purpose), slog.Any("error", sendErr))
+			return phone, ErrOTPSendFailed
+		}
+		// Режим разработки: WhatsApp недоступен — печатаем код в лог и продолжаем,
+		// чтобы можно было завершить вход/регистрацию без реального сообщения.
+		s.log.Warn("otp: код НЕ отправлен (нет WhatsApp); режим разработки — используйте код из лога",
+			slog.String("purpose", purpose), slog.String("phone", phone), slog.String("code", code),
+			slog.Any("send_error", sendErr))
+		sent = nil
+	}
 
 	rec := &model.OTPCode{
 		Purpose:     purpose,
@@ -118,15 +137,6 @@ func (s *OTPService) Request(ctx context.Context, rawPhone, purpose, lang, ip st
 	if sent != nil {
 		rec.InstanceID = sent.InstanceID
 		rec.MessageID = sent.MessageID
-	}
-	// Код сохраняем, только если он ушёл: иначе пользователь получит «отправлено»,
-	// но кода у него не будет.
-	if sendErr != nil {
-		s.log.Error("otp: отправка кода", slog.String("purpose", purpose), slog.Any("error", sendErr))
-		if errors.Is(sendErr, messaging.ErrNoInstance) {
-			return phone, ErrOTPSendFailed
-		}
-		return phone, ErrOTPSendFailed
 	}
 	if _, err := s.store.Create(ctx, rec); err != nil {
 		return phone, httpx.ErrInternal(err)

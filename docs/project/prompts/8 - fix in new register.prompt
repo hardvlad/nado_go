@@ -1,0 +1,5 @@
+Теперь при попытке регистрации /register почему-то отдается html страница с кодом 422. Проверь, пожалуйста, и исправь
+
+После успешного добавления магазина в логах импорта появляется следующая ошибка
+msg="jobs: задача завершилась ошибкой" service=nado job_id=13 kind=catalog.build_store attempt=3 permanent=false error="repository: построение товара 101065388_956587677: mssql: An action of type 'WHEN MATCHED' cannot appear more than once in a 'UPDATE' clause of a MERGE statement. (10714)"
+Проверь, пожалуйста, и исправь

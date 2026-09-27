@@ -128,7 +128,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		return bundle.Localizer(l).T("phone.otp_message", "Code", code)
 	}
 	otpService := service.NewOTPService(
-		repository.NewOTPRepository(db), box, sender, codeMessage, cfg.Messaging.OTPTTL, log)
+		repository.NewOTPRepository(db), box, sender, codeMessage, cfg.Messaging.OTPTTL, !cfg.IsProduction(), log)
 
 	// Очередь фоновых задач и раздача заданий удалённым воркерам (D-12, D-23).
 	jobsRepo := jobs.NewRepository(db)
@@ -231,7 +231,7 @@ func New(ctx context.Context, version string) (*App, error) {
 	}
 	// Вход покупателей по телефону (D-17): код в WhatsApp через тот же пул GreenAPI.
 	customerAuth := service.NewCustomerAuthService(
-		repository.NewCustomerRepository(db), box, sender, codeMessage, log)
+		repository.NewCustomerRepository(db), box, sender, codeMessage, !cfg.IsProduction(), log)
 
 	cartRepo := repository.NewCartRepository(db)
 	shopHandler := shop.New(shop.Deps{
