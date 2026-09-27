@@ -1,0 +1,6 @@
+Проверил - при проверке введенного OTP кода, отправленного при добавлении магазина - в джобе выдается ошибка: задача завершилась ошибкой"  kind=kaspi.verify_otp permanent=true error="kaspicabinet: не удалось войти в кабинет: список кабинетов → 401
+
+Проверь реализацию - чтобы она была как в файле docs/project/kaspi_samples/lk_otp_checker.php и интеграция добавления была как в файлах docs/project/kaspi_samples/KaspiImport.php и docs/project/kaspi_samples/KaspiAPI.php
+Также я добавил файлы фронтенда из прошлого проекта - в папке docs/project/kaspi_samples/pages
+
+Проверь все и исправь ошибку - нужно чтобы магазин без ошибок добавлялся

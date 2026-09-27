@@ -49,11 +49,24 @@ type AccountInfo struct {
 	OrdersTotal int // всего заказов по данным meta (справочно)
 }
 
-// Verify проверяет токен запросом одной страницы заказов.
+// orderStates — состояния заказов Kaspi. Эндпоинт /orders требует фильтр по
+// состоянию, поэтому импорт идёт по каждому состоянию (порт KaspiAPI.php).
+var orderStates = []string{"NEW", "SIGN_REQUIRED", "PICKUP", "DELIVERY", "KASPI_DELIVERY", "ARCHIVE"}
+
+// dayMillis — сутки в миллисекундах (creationDate у Kaspi — в мс).
+const dayMillis = int64(86400000)
+
+// Verify проверяет токен запросом заказов. Kaspi требует фильтр по состоянию и
+// диапазон дат создания (в мс) — как KaspiAPI.validateToken; без них ответ 400,
+// а не 200. Берём заведомо пустое будущее окно: важно лишь, что токен принят.
 func (o *Official) Verify(ctx context.Context, token string) (*AccountInfo, error) {
+	now := time.Now().UnixMilli()
 	q := url.Values{}
 	q.Set("page[number]", "0")
 	q.Set("page[size]", "1")
+	q.Set("filter[orders][state]", "NEW")
+	q.Set("filter[orders][creationDate][$ge]", strconv.FormatInt(now, 10))
+	q.Set("filter[orders][creationDate][$le]", strconv.FormatInt(now+dayMillis, 10))
 
 	var resp ordersResponse
 	if err := o.get(ctx, token, "/orders", q, &resp); err != nil {
@@ -76,34 +89,44 @@ type Order struct {
 	Raw           json.RawMessage
 }
 
-// Orders обходит заказы, созданные не раньше since. Пагинация скрыта внутри.
-//
-// ⚠️ Точный синтаксис фильтров Kaspi (имена параметров filter[...]) не
-// подтверждён по документации — сверить с Kaspi Гидом перед проливкой в прод.
+// Orders обходит заказы, созданные не раньше since, по всем состояниям. Kaspi
+// требует фильтр по состоянию и диапазон дат создания (в мс), поэтому обход идёт
+// по каждому состоянию с пагинацией (порт KaspiAPI.getOrdersByStatusAndCreateDate).
+// Один заказ в момент запроса находится в одном состоянии, дублей между
+// состояниями нет; повторную запись всё равно снимает Upsert по external_id.
 func (o *Official) Orders(ctx context.Context, token string, since time.Time) iter.Seq2[Order, error] {
 	return func(yield func(Order, error) bool) {
 		const pageSize = 100
-		for page := 0; ; page++ {
-			q := url.Values{}
-			q.Set("page[number]", strconv.Itoa(page))
-			q.Set("page[size]", strconv.Itoa(pageSize))
-			if !since.IsZero() {
-				q.Set("filter[orders][creationDate][$ge]", strconv.FormatInt(since.UnixMilli(), 10))
-			}
+		now := time.Now()
+		if since.IsZero() {
+			since = now.Add(-14 * 24 * time.Hour)
+		}
+		geMs := strconv.FormatInt(since.UnixMilli(), 10)
+		leMs := strconv.FormatInt(now.UnixMilli(), 10)
 
-			var resp ordersResponse
-			if err := o.get(ctx, token, "/orders", q, &resp); err != nil {
-				yield(Order{}, err)
-				return
-			}
-			for _, d := range resp.Data {
-				if !yield(d.normalize(), nil) {
+		for _, state := range orderStates {
+			for page := 0; ; page++ {
+				q := url.Values{}
+				q.Set("page[number]", strconv.Itoa(page))
+				q.Set("page[size]", strconv.Itoa(pageSize))
+				q.Set("filter[orders][state]", state)
+				q.Set("filter[orders][creationDate][$ge]", geMs)
+				q.Set("filter[orders][creationDate][$le]", leMs)
+
+				var resp ordersResponse
+				if err := o.get(ctx, token, "/orders", q, &resp); err != nil {
+					yield(Order{}, err)
 					return
 				}
-			}
-			// Последняя страница: пришло меньше, чем размер страницы.
-			if len(resp.Data) < pageSize {
-				return
+				for _, d := range resp.Data {
+					if !yield(d.normalize(), nil) {
+						return
+					}
+				}
+				// Последняя страница состояния: пришло меньше, чем размер страницы.
+				if len(resp.Data) < pageSize {
+					break
+				}
 			}
 		}
 	}

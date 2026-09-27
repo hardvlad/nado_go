@@ -115,6 +115,12 @@ func (c *Client) do(method, url string, headers []string, body []byte) (response
 	}
 	for _, h := range headers {
 		if k, v, ok := strings.Cut(h, ": "); ok {
+			// Accept-Encoding не проставляем сами: тогда net/http добавит gzip и
+			// прозрачно распакует ответ. Образец на PHP анонсирует br/zstd, которые
+			// Go не умеет распаковывать, — иначе тело осталось бы сжатым.
+			if strings.EqualFold(k, "Accept-Encoding") {
+				continue
+			}
 			req.Header.Set(k, v)
 		}
 	}
@@ -130,11 +136,14 @@ func (c *Client) do(method, url string, headers []string, body []byte) (response
 	}
 
 	out := response{status: resp.StatusCode, body: data}
-	if sc := resp.Header.Get("Set-Cookie"); sc != "" {
-		out.setCookie = firstCookie(sc)
+	// Берём ПОСЛЕДНИЙ Set-Cookie ответа, как это делает образец (в его
+	// header-колбэке $setCookie перезаписывается на каждом заголовке). Ответы
+	// кабинета ставят несколько cookie, и нужный — последний; иначе дальше 401.
+	if scs := resp.Header.Values("Set-Cookie"); len(scs) > 0 {
+		out.setCookie = firstCookie(scs[len(scs)-1])
 	}
-	if loc := resp.Header.Get("Location"); loc != "" {
-		out.location = strings.TrimSpace(strings.SplitN(loc, ";", 2)[0])
+	if locs := resp.Header.Values("Location"); len(locs) > 0 {
+		out.location = strings.TrimSpace(strings.SplitN(locs[len(locs)-1], ";", 2)[0])
 	}
 	return out, nil
 }

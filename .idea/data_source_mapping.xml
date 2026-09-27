@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/migrations/0001_init.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0002_accounts_auth_feedback.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0003_jobs.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0004_messaging_otp.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0005_stores_marketplace.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0006_marketplace_products.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0007_kaspi_mfa_codes.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0008_kaspi_onboarding.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0009_catalog.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0010_store_domains.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0011_customers.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0012_cart_orders.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+  </component>
+</project>

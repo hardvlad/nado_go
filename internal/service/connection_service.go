@@ -27,8 +27,9 @@ var (
 )
 
 // initialOrdersWindow — за какой период импортируются заказы при первом
-// подключении, если синхронизаций ещё не было.
-const initialOrdersWindow = 30 * 24 * time.Hour
+// подключении, если синхронизаций ещё не было. Kaspi ограничивает диапазон дат
+// создания в запросе заказов ~14 днями, поэтому берём 14 дней.
+const initialOrdersWindow = 14 * 24 * time.Hour
 
 // ConnectionService подключает магазин к маркетплейсу и синхронизирует заказы.
 type ConnectionService struct {

@@ -47,6 +47,15 @@ func TestOrdersPaginateAndNormalize(t *testing.T) {
 	page1 := `{"data":[{"type":"orders","id":"o2","attributes":{"code":"C2","state":"DELIVERY","status":"ACCEPTED_BY_MERCHANT","totalPrice":5000.5,"creationDate":1690000100000,"customer":{"name":"Батыр","cellPhone":"+77022223344"}}}],"meta":{"totalCount":101,"pageCount":2}}`
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Эндпоинт требует фильтр по состоянию; данные отдаём только для NEW,
+		// остальные состояния пустые (как реальный кабинет с заказами в одном статусе).
+		if st := r.URL.Query().Get("filter[orders][state]"); st != "NEW" {
+			w.Write([]byte(`{"data":[],"meta":{"totalCount":0,"pageCount":0}}`))
+			return
+		}
+		if r.URL.Query().Get("filter[orders][creationDate][$ge]") == "" || r.URL.Query().Get("filter[orders][creationDate][$le]") == "" {
+			t.Error("нет диапазона дат создания в запросе заказов")
+		}
 		if r.URL.Query().Get("page[number]") == "0" {
 			w.Write([]byte(page0))
 		} else {
@@ -57,7 +66,7 @@ func TestOrdersPaginateAndNormalize(t *testing.T) {
 
 	c := NewOfficial(WithBaseURL(srv.URL))
 	var orders []Order
-	for o, err := range c.Orders(context.Background(), "good", time.UnixMilli(1689000000000)) {
+	for o, err := range c.Orders(context.Background(), "good", time.Now().Add(-7*24*time.Hour)) {
 		if err != nil {
 			t.Fatal(err)
 		}

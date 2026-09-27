@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="robots" content="noindex, nofollow">
+	<title>Профиль - ProfitBot.KZ</title>
+	<link rel="icon" type="image/png" href="/images/favicon.png">
+
+	<!-- ================== BEGIN PAGE LEVEL CSS START ================== -->
+	<link rel="stylesheet" href="assets/css/icons.css" />
+	<link rel="stylesheet" href="assets/libs/wave-effect/css/waves.min.css" />
+	<link rel="stylesheet" href="assets/libs/owl-carousel/css/owl.carousel.min.css" />
+	<!-- ================== BEGIN PAGE LEVEL END ================== -->
+	<!-- ================== Plugins CSS  ================== -->
+	<link rel="stylesheet" href="assets/libs/flatpicker/css/flatpickr.min.css">
+	<link href="assets/libs/bootstrap-tagsinput/css/bootstrap-tagsinput.css" rel="stylesheet" />
+	<link href="assets/libs/select2/css/select2.min.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/libs/datatables/css/datatables.min.css" rel="stylesheet" />
+	<!-- ================== Plugins CSS ================== -->
+	<!-- ================== BEGIN APP CSS  ================== -->
+	<link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+	<link rel="stylesheet" href="assets/css/styles.min.css" />
+    <link rel="stylesheet" href="assets/css/copy_clipboard.css" />
+	<!-- ================== END APP CSS ================== -->
+
+	<!-- ================== BEGIN POLYFILLS  ================== -->
+	<!--[if lt IE 9]>
+	   <script src="assets/libs/html5shiv/js/html5shiv.js"></script>
+	   <script src="assets/libs/respondjs/js/respond.min.js"></script>
+	<![endif]-->
+	<!-- ================== END POLYFILLS  ================== -->
+</head>
+
+<body class="dark-sidebar-menu">
+	<!-- Begin Page -->
+	<div class="page-wrapper">
+
+$header
+$leftnavigation
+
+		<!-- Begin main content -->
+		<div class="main-content">
+			<!-- content -->
+			<div class="page-content">
+				<!-- page header -->
+				<div class="page-title-box">
+					<div class="container-fluid">
+						<div class="page-title dflex-between-center">
+							<h3 class="mb-1 fw-bold text-dark">Ваш профиль</h3>
+							<ol class="breadcrumb">
+								<li class="breadcrumb-item">
+									<a href="/profile">
+										<i class="bx bx-home fs-xs"></i>
+									</a>
+								</li>
+								<li class="breadcrumb-item active">Ваш профиль</li>
+							</ol>
+						</div>
+					</div>
+				</div>
+				<!-- page content -->
+				<div class="page-content-wrapper mt--45">
+					<div class="container-fluid">
+						<div class="row">
+							<div class="col-lg-4 col-xl-3">
+								<div class="card">
+									<div class="card-body">
+										<div class="mt-3 pt-2 border-top">
+											<h5 class="mb-3 pt-2 fw-semibold text-dark">Контактная информация</h5>
+												<div class="table-responsive">
+													<table class="table table-borderless text-muted mb-0 table-sm fs-14">
+														<tbody>
+															<tr>
+																<th class="pl-0" scope="row">Email</th>
+																<td>$email</td>
+															</tr>
+															<tr>
+																<th class="pl-0" scope="row">Телефон</th>
+																<td>$phone</td>
+															</tr>
+														</tbody>
+													</table>
+												</div>
+										</div>
+									</div>
+								</div>
+
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="mt-3 pt-2 border-top">
+                                            <h5 class="mb-3 pt-2 fw-semibold text-dark">Реферальная программа (<a href="https://profitbot.kz/referral" target="_blank">как работает?</a>)</h5>
+                                            <div class="table-responsive">
+                                                <table class="table table-borderless text-muted mb-0 table-sm fs-14">
+                                                    <tbody>
+                                                    <tr>
+                                                        <th class="pl-0" scope="row">Ваша ссылка:</th>
+                                                        <td>
+                                                            <div class="copy-link form-group">
+                                                                <input class="form-control copy-link-input" readonly type="text" value="https://pbot.kz/s?ref=$refcode">
+                                                                <button type="button" class="copy-link-button" >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16">
+                                                                        <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2Zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6ZM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2Z"/>
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+
+                                                    </tr>
+                                                    <tr>
+                                                        <th class="pl-0" scope="row">% отчислений</th>
+                                                        <td>$referalPrecent</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th class="pl-0" scope="row">Ваш баланс</th>
+                                                        <td>$referalBalance тг.</td>
+                                                    </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="card" id="payments">
+                                    <div class="card-body">
+                                        <div class="mt-3 pt-2 border-top">
+                                            <span>$subscriptionText</span>
+                                            <div class="form-group me-2">
+                                                <b>Нажмите на нужный тариф для перехода к оплате</b>
+                                            </div>
+                                            <div class="list-group">
+                                                $serviceSelectList
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- end card -->
+
+                                <div class="d-none">
+									<!-- end card -->
+									<div class="card">
+										<div class="card-body">
+											<h5 class="mb-4 fw-semibold text-dark">Контактная информация</h5>
+											<div class="table-responsive">
+												<table class="table table-borderless text-muted mb-0 table-sm fs-14">
+													<tbody>
+														<tr>
+															<th class="pl-0" scope="row">Email</th>
+															<td>$email</td>
+														</tr>
+														<tr>
+															<th class="pl-0" scope="row">Телефон</th>
+															<td>$phone</td>
+														</tr>
+													</tbody>
+												</table>
+											</div>
+										</div>
+									</div>
+
+								</div>
+								<!-- end card -->
+							</div>
+							<div class="col-lg-8 col-xl-9">
+								<div class="card">
+									<div class="card-body">
+										<ul class="nav nav-pills bg-light nav-justified" id="pills-tab" role="tablist">
+											<li class="nav-item">
+												<a class="nav-link active" id="pills-tasks-tab" data-bs-toggle="pill" href="#pills-tasks" role="tab"
+													aria-controls="pills-tasks" aria-selected="false">
+													Каспи магазины
+												</a>
+											</li>
+											<li class="nav-item">
+												<a class="nav-link" id="pills-telegram-tab" data-bs-toggle="pill" href="#pills-telegram" role="tab"
+												   aria-controls="pills-settings" aria-selected="false">
+													Telegram-чаты
+												</a>
+											</li>
+											<li class="nav-item">
+												<a class="nav-link" id="pills-messages-tab" data-bs-toggle="pill" href="#pills-settings" role="tab"
+													aria-controls="pills-settings" aria-selected="false">
+													Настройки
+												</a>
+											</li>
+											<li class="nav-item">
+												<a class="nav-link" id="pills-payments-tab" data-bs-toggle="pill" href="#pills-payments" role="tab"
+												   aria-controls="pills-settings" aria-selected="false">
+													Оплаты услуг
+												</a>
+											</li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" id="pills-referral-tab" data-bs-toggle="pill" href="#pills-referral" role="tab"
+                                                   aria-controls="pills-settings" aria-selected="false">
+                                                    Реферальная программа
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" id="pills-mcp-tab" data-bs-toggle="pill" href="#pills-mcp" role="tab"
+                                                   aria-controls="pills-mcp" aria-selected="false">
+                                                    AI-ассистент
+                                                </a>
+                                            </li>
+										</ul>
+
+										<div class="tab-content mt-4 pt-3" id="pills-tabContent">
+
+
+											<div class="tab-pane fade show active" id="pills-tasks" role="tabpanel" aria-labelledby="pills-tasks-tab">
+												<div class="card mb-0 shadow-none">
+
+													<div class="card-header p-0">
+														<div class="row">
+															<div class="col-12 text-sm-center dflex-between-center">
+																<h5 class="card-title"> Ваши Каспи магазины </h5>
+																<div class="form-group me-2">
+																	<button id="addkaspishop" class="btn btn-primary" onclick="addKaspiShop()"><i class="bx bx-plus bx-flashing"></i>
+																		Добавить Каспи магазин</button>
+																</div>
+															</div>
+														</div>
+													</div>
+
+													<div class="card-body px-0" id="kaspi_shops_card_div">
+
+$kaspi_shops_list
+
+													</div>
+
+												</div>
+											</div>
+
+											<div class="tab-pane fade show " id="pills-telegram" role="tabpanel" aria-labelledby="pills-telegram-tab">
+												<div class="card mb-0 shadow-none">
+
+													<div class="card-header p-0">
+														<div class="row">
+															<div class="col-12 text-sm-center dflex-between-center">
+																<h5 class="card-title"> Войти в Telegram-чат </h5>
+																<div class="form-group me-2">
+																	<a class="btn btn-primary" href="$telegrambotreflink">
+																		Перейти в Telegram чат</a>
+																</div>
+															</div>
+														</div>
+
+														<div class="row">
+															<p>Нажмите на кнопку (или отсканируйте QR код), чтобы перейти в Telegram и в Telegram нажмите кнопку START. </p>
+															<a href="$telegramurl"><img src="$telegramqrcode" alt="Telegram QR Code" /></a>
+														</div>
+
+													</div>
+
+													<div class="card-body px-0" id="telegram_chats_card_div">
+
+														$telegram_chats_list
+
+													</div>
+
+												</div>
+											</div>
+
+											<div class="tab-pane fade" id="pills-settings" role="tabpanel" aria-labelledby="pills-tasks-tab">
+												<div class="card mb-0 shadow-none">
+													<div class="card-header p-0">
+														<h5 class="card-title"> Редактировать информацию</h5>
+													</div>
+													<div class="card-body px-0">
+														<form action="#" novalidate="novalidate" id="addprofileform" data-type="edit">
+
+															<div class="row">
+																<div class="col-lg-6">
+																	<div class="form-group floating-label enable-floating-label show-label">
+																		<input class="form-control" id="email" name="validation-email" type="text"
+																			   placeholder="example@example.com" value="$email" disabled>
+																		<label for="email">Емейл адрес<span class="text-danger">*</span></label>
+																	</div>
+																</div>
+																<div class="col-lg-6">
+																	<div class="form-group floating-label enable-floating-label show-label">
+																		<input class="form-control" id="tel" name="validation-phone" type="text"
+																			   placeholder="+7 (000) 000-00-00" value="$phone">
+																		<label for="tel">Номер телефона</label>
+																		<div class="validation-error d-none fs-13">
+																			Пожалуйста, введите номер телефона
+																		</div>
+																	</div>
+																</div>
+															</div>
+
+															<div class="row">
+																<div class="col-lg-6">
+																	<div class="form-group floating-label enable-floating-label show-label">
+																		<input class="form-control" id="fname" name="validation-firstname" type="text"
+																			placeholder="John" value="$fname">
+																		<label for="fname">Имя</label>
+																	</div>
+																</div>
+																<div class="col-lg-6">
+																	<div class="form-group floating-label enable-floating-label show-label">
+																		<input class="form-control" id="lname" name="validation-lastname" type="text"
+																			placeholder="Doe" value="$lname">
+																		<label for="lname">Фамилия</label>
+																	</div>
+																</div>
+															</div>
+
+															<div class="pt-4">
+																<button class="btn btn-primary ms-1" data-effect="wave" type="submit">Сохранить</button>
+															</div>
+														</form>
+													</div>
+
+                                                    <div class="card mb-0 shadow-none">
+                                                        <div class="card-header p-0">
+                                                            <h5 class="card-title"> Изменить пароль</h5>
+                                                        </div>
+                                                        <div class="card-body px-0">
+                                                            <div class="alert alert-danger alert-dismissible fade show" role="alert" id="error_alert" style="display: none;">
+                                                                <span id="alert_text"> This is a danger alert—check it out! </span>
+                                                            </div>
+                                                            <form action="#" novalidate="novalidate" id="changepasswordform" data-type="edit">
+
+                                                                <div class="row">
+                                                                    <div class="col-lg-6">
+                                                                        <div class="form-group floating-label enable-floating-label show-label">
+                                                                            <input class="form-control" id="newpassword" name="validation-newpassword" type="password">
+                                                                            <label for="email">Новый пароль<span class="text-danger">*</span></label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="row">
+                                                                    <div class="col-lg-6">
+                                                                        <div class="form-group ">
+                                                                            <div class="form-check form-switch custom-switch">
+                                                                                <input type="checkbox" class="form-check-input" id="logoffall" name="logoffall" value="1">
+                                                                                <label class="form-check-label" for="logoffall">Завершить все сеансы</label><br>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="pt-4">
+                                                                    <button class="btn btn-primary ms-1" data-effect="wave" type="submit">Изменить пароль</button>
+                                                                    <button type="button" id="changePasswordSuccess" class="btn btn-success waves-effect waves-light" data-effect="wave" style="display: none;">Успешно изменено</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+												</div>
+											</div>
+
+											<div class="tab-pane fade show " id="pills-payments" role="tabpanel" aria-labelledby="pills-payments-tab">
+												<div class="card mb-0 shadow-none">
+
+													<div class="card-header p-0">
+														<div class="row">
+															<div class="col-12 text-sm-center dflex-between-center">
+																<h5 class="card-title"> Ваши оплаты услуг </h5>
+															</div>
+														</div>
+													</div>
+
+													<div class="card-body px-0" id="payments_card_div">
+														<div class="table-responsive" id="kaspi_shops_list_div">
+															<table class="table nowrap table-hover table-centered" id="view_kaspi_shop_list">
+																<thead class="table-light">
+																<tr>
+																	<th>Дата оплаты</th>
+																	<th>Сумма</th>
+																	<th>Услуга</th>
+																</tr>
+																</thead>
+																<tbody>
+																$payments_list
+																</tbody>
+															</table>
+														</div>
+													</div>
+
+												</div>
+											</div>
+
+                                            <div class="tab-pane fade show " id="pills-referral" role="tabpanel" aria-labelledby="pills-referral-tab">
+                                                <div class="card mb-0 shadow-none">
+
+                                                    <div class="card-header p-0">
+                                                        <div class="row">
+                                                            <div class="col-12 text-sm-center dflex-between-center">
+                                                                <h5 class="card-title"> Пользователи, зарегистрированные по Вашей ссылке </h5>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="card-body px-0" id="referal_users_card_div">
+
+                                                        <div class="table-responsive">
+                                                            <table class="table table-hover table-nowrap mb-0" id="user_table_list">
+                                                                <thead>
+                                                                <tr>
+                                                                    <th>Дата регистрации</th>
+                                                                    <th>Имя</th>
+                                                                    <th>Email</th>
+                                                                    <th>Телефон</th>
+                                                                    <th>Магазинов</th>
+                                                                    <th>Сумма оплат</th>
+                                                                    <th>Подписка до</th>
+                                                                    <th>Whatsapp до</th>
+                                                                </tr>
+                                                                </thead>
+                                                                <tbody>
+
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="card mb-0 shadow-none">
+
+                                                    <div class="card-header p-0">
+                                                        <div class="row">
+                                                            <div class="col-12 text-sm-center dflex-between-center">
+                                                                <h5 class="card-title"> Оплаты по реферальной программе </h5>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="card-body px-0" id="referal_payments_card_div">
+
+                                                        <div class="table-responsive">
+                                                            <table class="table table-hover table-nowrap mb-0" id="payments_table_list">
+                                                                <thead>
+                                                                <tr>
+                                                                    <th>Дата</th>
+                                                                    <th>Сумма</th>
+                                                                    <th>Тип</th>
+                                                                </tr>
+                                                                </thead>
+                                                                <tbody>
+
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+                                            </div>
+
+                                            <div class="tab-pane fade" id="pills-mcp" role="tabpanel" aria-labelledby="pills-mcp-tab">
+                                                <div class="card mb-0 shadow-none">
+
+                                                    <div class="card-header p-0">
+                                                        <div class="row">
+                                                            <div class="col-12 text-sm-center dflex-between-center">
+                                                                <h5 class="card-title"> Подключение AI-ассистента (MCP) </h5>
+                                                                <div class="form-group me-2">
+                                                                    <button id="addmcptoken" class="btn btn-primary" onclick="generateMcpToken()"><i class="bx bx-plus bx-flashing"></i>
+                                                                        Создать токен доступа</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="card-body px-0">
+                                                        <p class="text-muted">
+                                                            Токен позволяет AI-ассистенту (например, Claude) читать аналитику продаж только вашего аккаунта.
+                                                            Адрес сервера: <code id="mcp-server-url">…</code>, авторизация: заголовок
+                                                            <code>Authorization: Bearer &lt;токен&gt;</code>.
+                                                        </p>
+
+                                                        <div class="alert alert-warning" id="mcp-new-token-alert" style="display:none;">
+                                                            <div>Скопируйте этот ключ сейчас — он больше не будет показан повторно.</div>
+                                                            <div class="input-group mt-2">
+                                                                <input class="form-control" id="mcp-new-token-value" readonly type="text" value="">
+                                                                <button type="button" class="btn btn-outline-secondary" onclick="copyMcpToken()">Копировать</button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="table-responsive">
+                                                            <table class="table table-hover table-nowrap mb-0" id="mcp_tokens_table">
+                                                                <thead>
+                                                                <tr>
+                                                                    <th>Название</th>
+                                                                    <th>Создан</th>
+                                                                    <th>Последнее использование</th>
+                                                                    <th>Статус</th>
+                                                                    <th></th>
+                                                                </tr>
+                                                                </thead>
+                                                                <tbody id="mcp_tokens_tbody">
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+
+                                                        <hr class="my-4">
+
+                                                        <h6 class="fw-semibold text-dark mb-3">Как подключить MCP-сервер в популярных AI-инструментах</h6>
+
+                                                        <p class="text-muted">
+                                                            Для подключения в любом инструменте, поддерживающем MCP, понадобятся два значения:
+                                                        </p>
+                                                        <ul class="text-muted">
+                                                            <li>Адрес сервера (URL): <code id="mcp-server-url-2">…</code></li>
+                                                            <li>Заголовок авторизации: <code>Authorization: Bearer &lt;ваш токен&gt;</code> (токен создаётся кнопкой выше)</li>
+                                                        </ul>
+
+                                                        <details class="mb-3">
+                                                            <summary class="fw-semibold" style="cursor:pointer;">Claude Desktop / Claude Code</summary>
+                                                            <div class="mt-2">
+                                                                <p class="text-muted">
+                                                                    Интерфейс Claude Desktop пока не позволяет указать произвольный заголовок авторизации напрямую,
+                                                                    поэтому подключение прописывается в конфигурационном файле через вспомогательный пакет
+                                                                    <code>mcp-remote</code> (требуется установленный Node.js):
+                                                                </p>
+                                                                <ol class="text-muted">
+                                                                    <li>В Claude Desktop откройте Settings → Developer → Edit Config (откроется файл <code>claude_desktop_config.json</code>).</li>
+                                                                    <li>Добавьте в секцию <code>mcpServers</code> блок ниже — сначала создайте токен кнопкой выше, тогда он подставится в пример автоматически.</li>
+                                                                    <li>Сохраните файл и перезапустите Claude Desktop.</li>
+                                                                </ol>
+                                                                <div class="position-relative">
+                                                                    <pre class="bg-light p-3 rounded" id="mcp-config-json" style="white-space:pre-wrap;"></pre>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="copyMcpConfig()">Копировать конфиг</button>
+                                                                </div>
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="mb-3">
+                                                            <summary class="fw-semibold" style="cursor:pointer;">Claude.ai (веб), ChatGPT и другие сервисы с поддержкой MCP-коннекторов</summary>
+                                                            <div class="mt-2">
+                                                                <p class="text-muted">
+                                                                    Эти сервисы поддерживают вход через OAuth — токен создавать не нужно, ProfitBot сам
+                                                                    предложит войти и подтвердить доступ. Например,
+                                                                    в Claude.ai: Settings → Connectors → Add custom connector; в ChatGPT: раздел Connectors / Apps
+                                                                    (доступность и точные названия пунктов меню могут отличаться и меняться со временем — уточняйте
+                                                                    в актуальной документации сервиса). В форме подключения достаточно указать только:
+                                                                </p>
+                                                                <ul class="text-muted">
+                                                                    <li>Адрес сервера (URL) — см. выше</li>
+                                                                </ul>
+                                                                <p class="text-muted">
+                                                                    После добавления сервис откроет окно входа в ProfitBot (если вы ещё не авторизованы) и
+                                                                    экран подтверждения доступа — после подтверждения сервис получит собственный токен,
+                                                                    который отобразится в таблице выше и который можно отозвать в любой момент.
+                                                                    Если нужный сервис поддерживает только заголовок авторизации без OAuth — используйте
+                                                                    статический токен, как описано выше.
+                                                                </p>
+                                                            </div>
+                                                        </details>
+                                                    </div>
+
+                                                </div>
+                                            </div>
+
+										</div>
+
+									</div>
+								</div>
+								<!-- end card -->
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- main content End -->
+		<!-- footer -->
+		<!-- footer -->
+		<div class="preloader">
+			<div class="status">
+				<div class="spinner-border avatar-sm text-primary m-2" role="status"></div>
+			</div>
+		</div>
+		<footer class="footer">
+			<div class="container-fluid">
+				<div class="row">
+					<div class="col-md-6 mb-1 mb-md-0">
+						<span><span id="date">2022</span> &copy; ProfitBot.KZ.</span>
+					</div>
+				</div>
+			</div>
+		</footer>
+
+		<div class="setting-sidebar">
+			<div class="card mb-0">
+				<div class="card-header">
+					<h5 class="card-title dflex-between-center">
+						Layouts
+						<a href="javascript:void(0)">
+							<i class="mdi mdi-close fs-sm"></i>
+						</a>
+					</h5>
+				</div>
+				<div class="card-body">
+					<div class="layout">
+						<a href="/profile?isDark=true">
+							<img src="/assets/images/dark-layout.jpg" alt="Темная тема" class="img-fluid" />
+							<h6 class="fs-16">Темная тема</h6>
+						</a>
+					</div>
+					<div class="layout">
+						<a href="/profile?isDark=false">
+							<img src="/assets/images/dark-layout.jpg" alt="Светлая тема" class="img-fluid" />
+							<h6 class="fs-16">Светлая тема</h6>
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- Page End -->
+
+	<div id="add-kaspi-modal" class="modal fade" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="add-kaspi-modalLabel" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title" id="add-kaspi-modalLabel">Добавить Каспи магазин</h4>
+					<button type="button" class="close" data-bs-dismiss="modal" aria-hidden="true">×</button>
+				</div>
+				<div class="modal-body">
+					<form id="addKaspiShopForm" class="px-3" action="#">
+
+                        <div id="kaspi_login_div">
+
+                            <div class="col-lg-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title">Вход в кабинет продавца</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="nav nav-tabs nav-bordered nav-justified">
+                                            <li class="nav-item">
+                                                <a href="#login-phone" data-bs-toggle="tab" aria-expanded="true" class="nav-link active" id="login-phone-link">
+                                                    Телефон
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a href="#login-email" data-bs-toggle="tab" aria-expanded="false" class="nav-link" id="login-email-link">
+                                                    Email
+                                                </a>
+                                            </li>
+                                        </ul>
+                                        <div class="tab-content">
+
+                                            <div class="tab-pane active" id="login-phone">
+                                                <div class="form-group">
+                                                    <label for="shopPhone">Введите номер телефона</label>
+                                                    <input class="form-control" type="text" id="shopPhone" name="validation-shopPhone" required="" placeholder="+7 (000) 000-00-00">
+                                                    <div class="validation-error d-none fs-13">
+                                                        <p>Введите номер телефона для входа в кабинет</p>
+                                                    </div>
+                                                </div>
+                                                <div class="alert alert-primary" role="alert" id="alert_sending" style="display: none;">
+                                                    Производится отправка кода на указанный номер телефона.
+                                                </div>
+                                                <div class="alert alert-success" role="alert" id="alert_sent_success" style="display: none;">
+                                                    <i class="mdi mdi-check-all me-2"></i> Код успешно отправлен.
+                                                </div>
+                                                <div class="alert alert-danger alert-dismissible fade show" role="alert" id="error_alert_send" style="display: none;">
+                                                    <span id="alert_text_send"> Отправка кода неуспешна. Проверьте номер телефона. </span>
+                                                </div>
+
+                                                <div class="form-group text-center" id="otp_send_button_div">
+                                                    <a class="btn btn-primary" type="submit" onclick="sendOTPCode()">Отправить код</a>
+                                                </div>
+
+                                                <div class="form-group" id="otpCodeDiv" style="display: none;">
+                                                    <label for="otpcode">Введите полученный код</label>
+                                                    <input class="form-control" type="text" id="otpcode" name="validation-otpcode" required="" placeholder="000000">
+                                                    <div class="validation-error d-none fs-13">
+                                                        <p>Введите полученный одноразовый код</p>
+                                                    </div>
+
+                                                    <div class="form-group text-center" id="otp_check_button_div">
+                                                        <a class="btn btn-primary" onclick="checkOTPCode()">Проверить код</a>
+                                                    </div>
+                                                </div>
+
+                                                <div class="alert alert-primary" role="alert" id="alert_checking" style="display: none;">
+                                                    Производится проверка кода.
+                                                </div>
+                                                <div class="alert alert-success" role="alert" id="alert_check_success" style="display: none;">
+                                                    <i class="mdi mdi-check-all me-2"></i> Код успешно проверен. Ждем создания пользователя в Каспи.
+                                                </div>
+                                                <div class="alert alert-success" role="alert" id="alert_check_finished" style="display: none;">
+                                                    <i class="mdi mdi-check-all me-2"></i> Интеграция завершена. Заполните остальные поля и сохраните магазин.
+                                                </div>
+                                                <div class="alert alert-danger alert-dismissible fade show" role="alert" id="error_alert_check" style="display: none;">
+                                                    <span id="alert_text_check"> Отправка кода неуспешна. Проверьте номер телефона. </span>
+                                                </div>
+
+                                            </div>
+
+
+                                            <div class="tab-pane" id="login-email">
+                                                <div class="form-group">
+                                                    <label for="lkemail">Логин в личный кабинет через Web-интерфейс (<a href="https://profitbot.kz/faq_login" target="_blank">Где взять</a>)</label>
+                                                    <div class="alert alert-danger bg-danger text-white border-0" role="alert" style="display: none" id="error-lk-creds">
+                                                        Логин или пароль в личный кабинет не верны! Пожалуйста, проверьте правильность введенных данных.
+                                                    </div>
+                                                    <input class="form-control" type="text" id="lkemail" name="validation-lkemail" required="" placeholder="test@test.com">
+                                                    <div class="validation-error d-none fs-13">
+                                                        <p>Введите Емейл для доступа в личный кабинет</p>
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="lkpassword">Пароль в личный кабинет через Web-интерфейс</label>
+                                                    <input class="form-control" type="password" id="lkpassword" name="validation-lkpassword" required="" placeholder="">
+                                                    <div class="validation-error d-none fs-13">
+                                                        <p>Введите пароль для доступа в личный кабинет</p>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div> <!-- end card-box-->
+                            </div> <!-- end col -->
+
+                        </div>
+
+						<div class="form-group">
+							<label for="shopname">Название магазина</label>
+							<input class="form-control" type="text" id="shopname" name="validation-shopname" required="" placeholder="Мой магазин">
+							<div class="validation-error d-none fs-13">
+								<p>Введите название магазина</p>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label for="taxpercent">% налога</label>
+							<input class="form-control" type="text" id="taxpercent" name="validation-taxpercent" required="" placeholder="% налога">
+							<div class="validation-error d-none fs-13">
+								<p>Введите % налога</p>
+							</div>
+						</div>
+
+                        <div class="form-group" id="kaspiSendPriceDiv">
+                            <div class="form-check form-switch custom-switch">
+                                <input type="checkbox" class="form-check-input" id="dosendprice" name="dosendprice" value="1">
+                                <label class="form-check-label" for="dosendprice">Регулярно загружать прайс в Kaspi</label><br>
+                            </div>
+                        </div>
+
+						<div class="form-group" id="kaspiShopLinkDiv">
+							<label for="xmlLink">Ссылка для импорта в Каспи</label>
+							<input class="form-control" type="text" id="xmlLink" readonly placeholder="">
+						</div>
+
+						<div class="form-group" id="apikeygroup">
+							<label for="apikey">Ключ АПИ для магазина (<a href="https://profitbot.kz/faq_api" target="_blank">Где взять</a>)</label>
+							<div class="alert alert-danger bg-danger text-white border-0" role="alert" style="display: none" id="error-api-key">
+								Ключ АПИ не верен! Пожалуйста, проверьте правильность введенных данных.
+							</div>
+							<input class="form-control" type="text" id="apikey" name="validation-apikey" required="" placeholder="yhTbvtrEf/gtt=">
+							<div class="validation-error d-none fs-13">
+								<p>Введите рабочий API ключ магазина</p>
+							</div>
+						</div>
+
+
+                        <div class="form-group" id="marketinglogingroup">
+                            <label for="marketinglogin">Логин в личный кабинет Kaspi Маркетинг (<a href="https://profitbot.kz/faq_reg_marketing" target="_blank">Где взять</a>)</label>
+                            <div class="alert alert-danger bg-danger text-white border-0" role="alert" style="display: none" id="error-marketing-creds">
+                                Логин или пароль в личный кабинет Kaspi Маркетинг не верны! Пожалуйста, проверьте правильность введенных данных.
+                            </div>
+                            <input class="form-control" type="text" id="marketinglogin" name="marketinglogin" placeholder="Введите номер телефона, например, 77770001122">
+                        </div>
+
+                        <div class="form-group" id="marketingpasswordgroup">
+                            <label for="marketingpassword">Пароль в личный кабинет Kaspi Маркетинг</label>
+                            <input class="form-control" type="password" id="marketingpassword" name="marketingpassword" placeholder="">
+                        </div>
+
+						<input type="hidden" id="shopid" name="shopid" value="0">
+
+						<div class="alert alert-info bg-info text-white border-0" role="alert" id="kaspi-shop-checking" style="display: none">
+							Производится проверка данных магазина. Пожалуйста, подождите!
+						</div>
+
+						<div class="card-header p-0" id="kaspi-store-card">
+							<div class="row">
+								<div class="col-12 text-sm-center dflex-between-center">
+									<h5 class="card-title"> Склады магазина </h5>
+									<div class="form-group me-2">
+										<a id="addkaspistore" class="btn btn-primary" onclick="addKaspiStore()"><i class="bx bx-plus bx-flashing"></i></a>
+									</div>
+								</div>
+							</div>
+							<div class="table-responsive" id="kaspi_store_list_div">
+								<table class="table nowrap table-hover table-centered" id="view_kaspi_storelist">
+									<thead class="table-light">
+									<tr>
+										<th>Код Каспи</th>
+										<th>Наименование</th>
+										<th>Действия</th>
+									</tr>
+									</thead>
+									<tbody id="view_kaspi_storelist_tbody">
+									</tbody>
+								</table>
+							</div>
+						</div>
+
+						<div class="form-group text-center">
+							<button class="btn btn-primary" type="submit" id="profileSaveButton">Сохранить</button>
+						</div>
+
+					</form>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+	<div id="delete-kaspi-modal" class="modal fade" tabindex="-1" style="display: none;" aria-hidden="true">
+		<div class="modal-dialog modal-sm">
+			<div class="modal-content modal-filled bg-danger">
+				<div class="modal-body p-4">
+					<div class="text-center">
+						<i class="bx bx-notification-off fs-xl text-white"></i>
+						<h4 class="mt-2 text-white">Удалить Каспи магазин</h4>
+						<p class="mt-3 text-white">Чтобы удалить Каспи магазин нажмите кнопку Удалить. Восстановить магазин будет невозможно.</p>
+						<button type="button" class="btn btn-primary my-2" onclick="doDeleteKaspiShop()">Удалить</button>
+						<button type="button" class="btn btn-light my-2" data-bs-dismiss="modal">Отмена</button>
+					</div>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+	<div id="saveProfile-success-modal" class="modal fade" tabindex="-1" style="display: none;" aria-hidden="true">
+		<div class="modal-dialog modal-sm">
+			<div class="modal-content">
+				<div class="modal-body p-4">
+					<div class="text-center">
+						<i class="bx bx-info-circle fs-xl text-info"></i>
+						<h4 class="mt-2">Сохранение</h4>
+						<p class="mt-3">Данные профиля успешно сохранены</p>
+						<button type="button" class="btn btn-info my-2" data-bs-dismiss="modal">Закрыть</button>
+					</div>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+	<div id="saveProfile-alert-modal" class="modal fade" tabindex="-1" style="display: none;" aria-hidden="true">
+		<div class="modal-dialog modal-sm">
+			<div class="modal-content">
+				<div class="modal-body p-4">
+					<div class="text-center">
+						<i class="bx bx-alarm-exclamation fs-xl text-warning"></i>
+						<h4 class="mt-2">Сохранение</h4>
+						<p class="mt-3">Данные профиля НЕ сохранились. Попробуйте еще раз.</p>
+						<button type="button" class="btn btn-warning text-white my-2" data-bs-dismiss="modal">Закрыть</button>
+					</div>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+	<div id="add-kaspi-store-modal" class="modal fade" tabindex="-1" aria-labelledby="add-kaspi-modalLabel" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title" id="add-kaspi-store-modalLabel">Добавить склад</h4>
+					<button type="button" class="close" data-bs-dismiss="modal" aria-hidden="true">×</button>
+				</div>
+				<div class="modal-body">
+					<form id="addKaspiShopStoreForm" class="px-3" action="#">
+
+						<div class="form-group">
+							<label for="storecode">Код склада в Каспи</label>
+							<input class="form-control" type="text" id="storecode" name="validation-storecode" required="" placeholder="PP1">
+							<div class="validation-error d-none fs-13">
+								<p>Введите код склада в Каспи</p>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label for="storename">Название склада</label>
+							<input class="form-control" type="text" id="storename" name="validation-storename" required="" placeholder="Мой склад">
+							<div class="validation-error d-none fs-13">
+								<p>Введите название склада</p>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label for="storeaddress">Адрес склада</label>
+							<input class="form-control" type="text" id="storeaddress" name="validation-storename" required="" placeholder="Адрес склада">
+							<div class="validation-error d-none fs-13">
+								<p>Введите адрес склада</p>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label for="storeaddresslink">Ссылка на адрес</label>
+							<input class="form-control" type="text" id="storeaddresslink" name="validation-storename" required="" placeholder="Ссылка на адрес">
+							<div class="validation-error d-none fs-13">
+								<p>Введите адрес склада</p>
+							</div>
+						</div>
+
+						<input type="hidden" id="storeid" name="storeid" value="0">
+
+						<div class="form-group text-center">
+							<button class="btn btn-primary" type="submit">Сохранить</button>
+						</div>
+
+					</form>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+	<div id="delete-kaspi-store-modal" class="modal fade" tabindex="-1" style="display: none;" aria-hidden="true">
+		<div class="modal-dialog modal-sm">
+			<div class="modal-content modal-filled bg-danger">
+				<div class="modal-body p-4">
+					<div class="text-center">
+						<i class="bx bx-notification-off fs-xl text-white"></i>
+						<h4 class="mt-2 text-white">Удалить склад Каспи магазина</h4>
+						<p class="mt-3 text-white">Чтобы удалить склад Каспи магазина нажмите кнопку Удалить. Восстановить склад будет невозможно.</p>
+						<button type="button" class="btn btn-primary my-2" onclick="doDeleteKaspiShopStore()">Удалить</button>
+						<button type="button" class="btn btn-light my-2" data-bs-dismiss="modal">Отмена</button>
+					</div>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+	<div id="select-merchant-modal" class="modal fade" tabindex="-1" aria-labelledby="select-merchant-modalLabel" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title" id="select-merchant-modalLabel">Выберите мерчанта</h4>
+					<button type="button" class="close" data-bs-dismiss="modal" aria-hidden="true">×</button>
+				</div>
+				<div class="modal-body">
+					<form id="select-merchant-modalForm" class="px-3" action="#">
+
+						<div class="form-group">
+							<label for="select-merchant-select">Выберите мерчанта</label>
+							<select class="form-control" id="select-merchant-select">
+							</select>
+						</div>
+
+						<div class="form-group text-center">
+							<a class="btn btn-primary" onclick="selectMerchant()">Сохранить</a>
+						</div>
+
+					</form>
+				</div>
+			</div><!-- /.modal-content -->
+		</div><!-- /.modal-dialog -->
+	</div>
+
+
+	<!-- ================== BEGIN BASE JS ================== -->
+	<script src="/assets/js/vendor.min.js"></script>
+	<!-- ================== END BASE JS ================== -->
+
+	<!-- ================== BEGIN PAGE LEVEL JS ================== -->
+	<script src="assets/libs/flatpicker/js/flatpickr.js"></script>
+	<script src="assets/libs/bootstrap-tagsinput/js/bootstrap-tagsinput.min.js"></script>
+	<script src="assets/libs/ckeditor4/ckeditor.js"></script>
+	<script src="assets/libs/form-mask/js/jquery.mask.min.js"></script>
+	<script src="assets/libs/select2/js/select2.min.js"></script>
+	<script src="assets/libs/jquery-validation/js/jquery.validate.min.js"></script>
+	<script src="assets/libs/jquery-validation/js/additional-methods.min.js"></script>
+	<!-- ================== END PAGE LEVEL JS ================== -->
+	<!-- ================== BEGIN PAGE JS ================== -->
+    <script src="/assets/libs/datatables/js/datatables.min.js?11"></script>
+	<script src="assets/libs/dragula/dragula.min.js"></script>
+	<script src="assets/js/pages/dragula.init.js"></script>
+	<script src="/assets/js/api.js"></script>
+	<script src="assets/js/pages/profile.js?75"></script>
+	<script src="assets/js/app.js"></script>
+    <script src="/assets/js/copy_clipboard.js"></script>
+	<!-- ================== END PAGE JS ================== -->
+
+	$needtopayalert
+
+</body>
+
+</html>

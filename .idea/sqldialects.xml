@@ -2,5 +2,18 @@
 <project version="4">
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/docs/project/kaspi_samples/0_db.sql" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0001_init.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0002_accounts_auth_feedback.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0003_jobs.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0004_messaging_otp.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0005_stores_marketplace.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0006_marketplace_products.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0007_kaspi_mfa_codes.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0008_kaspi_onboarding.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0009_catalog.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0010_store_domains.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0011_customers.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/0012_cart_orders.sql" dialect="TSQL" />
+    <file url="PROJECT" dialect="TSQL" />
   </component>
 </project>
