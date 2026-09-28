@@ -1,1 +1,5 @@
 Теперь давай сделаем редактирование категорий товара и самих товаров в кабинете продавца
+
+Когда захожу на страницу товаров - получаю ошибку - level=ERROR msg="ошибка страницы" service=nado request_id=my.profitbot.kz/S8cvdFj9yH-000009 method=GET path=/stores/2/catalog error="Внутренняя ошибка сервера: repository: чтение товара кабинета: sql: Scan error on column index 7, name \"\": converting driver.Value type bool (\"true\") to a int: invalid syntax"
+time=2026-09-28T11:47:20.630+05:00 level=ERROR msg="запрос завершён с ошибкой" service=nado request_id=my.profitbot.kz/S8cvdFj9yH-000009 method=GET path=/stores/2/catalog status=500
+Исправь, пожалуйста

@@ -372,15 +372,11 @@ func (r *CatalogRepository) CabinetProducts(ctx context.Context, q CabinetProduc
 		total int
 	)
 	for rows.Next() {
-		var (
-			p       CabinetProduct
-			visible int
-		)
+		var p CabinetProduct
 		if err := rows.Scan(&p.ID, &p.Title, &p.CategoryName, &p.Status,
-			&p.PriceMinor, &p.Currency, &p.PriceMode, &visible, &p.Image, &p.Qty, &total); err != nil {
+			&p.PriceMinor, &p.Currency, &p.PriceMode, &p.IsVisible, &p.Image, &p.Qty, &total); err != nil {
 			return nil, 0, fmt.Errorf("repository: чтение товара кабинета: %w", err)
 		}
-		p.IsVisible = visible == 1
 		out = append(out, p)
 	}
 	return out, total, rows.Err()
@@ -446,14 +442,12 @@ func (r *CatalogRepository) GetProductForEdit(ctx context.Context, storeID, acco
 		FROM dbo.variants v
 		LEFT JOIN dbo.store_offers o ON o.variant_id = v.id
 		WHERE v.product_id = @id ORDER BY v.id;`
-	var visible int
 	err = r.db.QueryRowContext(ctx, variant, sql.Named("id", id)).
 		Scan(&e.VariantID, &e.SKU, &e.PriceMode, &e.ManualPriceMinor, &e.OfferPriceMinor,
-			&e.OldPriceMinor, &e.Currency, &visible, &e.Qty, &e.SourcePriceMinor)
+			&e.OldPriceMinor, &e.Currency, &e.IsVisible, &e.Qty, &e.SourcePriceMinor)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("repository: вариант товара %d: %w", id, database.MapError(err))
 	}
-	e.IsVisible = visible == 1
 	return e, nil
 }
 
