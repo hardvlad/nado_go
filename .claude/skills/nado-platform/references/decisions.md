@@ -675,3 +675,42 @@ nado-go-conventions (`references/jobs-queue.md`).
   фильтре игнорируется). Адрес показывается из JSON `{"text": ...}` (как пишет
   checkout). Шаблоны `store_orders.gohtml`/`store_order.gohtml`, класс
   `.badge--status` на токенах info. i18n-ключи `sorders.*` в ru/kk/en.
+
+## D-39. Редактирование категорий и товаров в кабинете + защита правок от синхронизации
+**Дата:** 2026-09-28 · **Источник:** требование редактировать категории и товары в кабинете продавца
+
+- **Защита правок (`products.overridden_fields`, миграция 0015).** Каталог витрины
+  для товаров из Kaspi перестраивается задачей `catalog.build_store` из зеркала и
+  раньше **затирал** category/brand/status/контент/изображения на каждом прогоне.
+  Реализован механизм из скилла nado-marketplace-import: изменённые продавцом поля
+  пишутся JSON-массивом токенов (`category|brand|status|content|images`) в
+  `products.overridden_fields`, и `CatalogRepository.BuildProduct` их не трогает
+  (category/brand/status через `OPENJSON`-CASE прямо в MERGE; content/images —
+  пропуск блока в Go по флагам). **status тоже под защитой** — иначе импорт вернул
+  бы архивный/черновой товар в `active`.
+- **Пометка правок — по диффу.** `CatalogEditService.SaveProduct` сравнивает форму
+  с текущими значениями и добавляет в overridden только реально изменённые поля
+  (для товаров с `source_sku`; ручные товары синхронизация не трогает вовсе, т.к.
+  MERGE идёт по `source_sku`). Кнопка «вернуть с Kaspi» (`ResetOverride`) убирает
+  токен и ставит `catalog.build_store` (dedup `catalog_build:<conn>`), значение
+  восстановит сборка; нет активного подключения — вернёт плановая синхронизация.
+- **Все языки витрины (RU/KK/EN).** Контент товара и названия категорий правятся
+  по всем языкам (переводы в `product_translations`/`category_translations`, MERGE
+  по (id, lang)); язык по умолчанию (`stores.default_lang`) обязателен, пустые
+  языки не пишутся (витрина берёт перевод по умолчанию через COALESCE). slug
+  генерится `Slugify`, конфликт `UX_*_slug` → `ErrSlugTaken`.
+- **Цена и видимость.** Отдельная форма оффера: `manual` фиксирует ручную цену
+  (`store_offers.price_mode='manual'`), `rule` считает цену по правилам D-14
+  (`SelectPriceRule`/`ApplyPriceRule` от цены маркетплейса). Цена вводится в
+  основных единицах, парсится в минорные (`parsePriceMinor`, 2 знака).
+- **Категории.** CRUD: дерево (parent_id, sort) + переводы; удаление только пустой
+  категории (есть подкатегории/товары → `database.ErrConflict` → `ErrCategoryNotEmpty`).
+  Ручные категории — без `external_code` (синхронизация их не трогает).
+- **Код.** repo `catalog_edit.go` (изоляция по store_id И account_id) +
+  `StoreRepository.ConnectionIDForStore`; сервис `catalog_edit_service.go`
+  (`Deps.Catalog`); хендлеры `handler/web/catalog_admin.go` под
+  `/stores/{id}/catalog`, `/products/{pid}/edit|price|reset`,
+  `/categories[...]`; шаблоны `catalog_products`/`product_edit`/`categories`/
+  `category_form`; ссылки «Товары»/«Категории» на карточке магазина в `/account`.
+  В `internal/view` добавлены функции шаблонов `img` (CDN-префикс как в теме,
+  переопределяется в `newRenderer`) и `list`; i18n-ключи `catalog.*`/`categories.*`.

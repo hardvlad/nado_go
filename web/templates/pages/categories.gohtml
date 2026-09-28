@@ -1,0 +1,49 @@
+{{/* Кабинет продавца: категории магазина. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "categories.title" }}{{ with .StoreName }} · {{ . }}{{ end }}</h1>
+            <span class="section-head__actions">
+                <a class="btn btn--ghost btn--sm" href="{{ .CatalogURL }}">{{ .L.T "categories.catalog_link" }}</a>
+                <a class="btn btn--primary btn--sm" href="{{ .NewURL }}">{{ .L.T "categories.add" }}</a>
+            </span>
+        </div>
+
+        {{ if .Saved }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "categories.saved") }}{{ end }}
+        {{ if .Deleted }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "categories.deleted") }}{{ end }}
+        {{ if .NotEmpty }}{{ template "alert" dict "Kind" "danger" "Text" (.L.T "categories.not_empty") }}{{ end }}
+
+        {{ if .Categories }}
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>{{ .L.T "categories.col_name" }}</th>
+                        <th>{{ .L.T "categories.col_parent" }}</th>
+                        <th>{{ .L.T "categories.col_products" }}</th>
+                        <th>{{ .L.T "categories.col_sort" }}</th>
+                        <th>{{ .L.T "categories.col_source" }}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Categories }}
+                    <tr>
+                        <td>{{ .Name }}</td>
+                        <td>{{ with .ParentName }}{{ . }}{{ else }}—{{ end }}</td>
+                        <td>{{ .ProductCount }}</td>
+                        <td>{{ .Sort }}</td>
+                        <td>{{ if .FromKaspi }}<span class="badge badge--muted">Kaspi</span>{{ else }}<span class="badge badge--active">{{ $.L.T "categories.source_manual" }}</span>{{ end }}</td>
+                        <td><a class="btn btn--ghost btn--sm" href="{{ $.EditBase }}/{{ .ID }}/edit">{{ $.L.T "categories.edit" }}</a></td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+        {{ else }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "categories.empty") }}
+        {{ end }}
+    </div>
+</section>
+{{ end }}

@@ -264,5 +264,10 @@ func builtinFuncs() template.FuncMap {
 		"lower": strings.ToLower,
 		"add":   func(a, b int) int { return a + b },
 		"sub":   func(a, b int) int { return a - b },
+		// list собирает срез значений прямо в шаблоне (для range по фикс. набору).
+		"list": func(values ...any) []any { return values },
+		// img по умолчанию отдаёт ссылку как есть; в приложении переопределяется
+		// вариантом с CDN-префиксом (WithFuncs в newRenderer).
+		"img": func(path string) string { return path },
 	}
 }

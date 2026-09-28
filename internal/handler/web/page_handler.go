@@ -33,7 +33,8 @@ type Deps struct {
 	OTP         *service.OTPService
 	Connections *service.ConnectionService
 	Onboarding  *service.KaspiOnboardingService
-	StoreOrders *service.OrderService // заказы витрины (для кабинета продавца)
+	StoreOrders *service.OrderService       // заказы витрины (для кабинета продавца)
+	Catalog     *service.CatalogEditService // редактирование категорий и товаров
 	Feedback    *service.FeedbackService
 	// SecureCookies — cookie только по HTTPS и с префиксом __Host-.
 	// В проде обязательно, локально по http — выключено.
@@ -102,6 +103,21 @@ func (h *PageHandler) Routes() chi.Router {
 	if h.StoreOrders != nil {
 		r.Get("/store-orders", h.wrap(h.StoreOrdersList))
 		r.Get("/store-orders/{id}", h.wrap(h.StoreOrderDetail))
+	}
+
+	// Редактирование каталога магазина: категории и товары.
+	if h.Catalog != nil {
+		r.Get("/stores/{id}/catalog", h.wrap(h.CatalogProducts))
+		r.Get("/stores/{id}/products/{pid}/edit", h.wrap(h.ProductEditForm))
+		r.Post("/stores/{id}/products/{pid}/edit", h.wrap(h.ProductEditSubmit))
+		r.Post("/stores/{id}/products/{pid}/price", h.wrap(h.ProductPriceSubmit))
+		r.Post("/stores/{id}/products/{pid}/reset", h.wrap(h.ProductResetOverride))
+		r.Get("/stores/{id}/categories", h.wrap(h.CategoriesList))
+		r.Get("/stores/{id}/categories/new", h.wrap(h.CategoryNewForm))
+		r.Post("/stores/{id}/categories/new", h.wrap(h.CategoryCreate))
+		r.Get("/stores/{id}/categories/{cid}/edit", h.wrap(h.CategoryEditForm))
+		r.Post("/stores/{id}/categories/{cid}/edit", h.wrap(h.CategoryEditSubmit))
+		r.Post("/stores/{id}/categories/{cid}/delete", h.wrap(h.CategoryDelete))
 	}
 
 	// Подключение через кабинет Kaspi (служебный сотрудник по SMS-коду владельца).

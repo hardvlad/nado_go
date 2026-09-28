@@ -172,6 +172,27 @@ func (r *StoreRepository) GetConnectionScope(ctx context.Context, connectionID i
 	return storeID, accountID, nil
 }
 
+// ConnectionIDForStore возвращает id активного подключения магазина (для
+// перестроения каталога). Нет подключения — database.ErrNotFound.
+func (r *StoreRepository) ConnectionIDForStore(ctx context.Context, accountID, storeID int64) (int64, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+
+	const query = `
+		SELECT TOP 1 id FROM dbo.marketplace_connections
+		WHERE store_id = @store AND account_id = @acc AND status = 'active'
+		ORDER BY id;`
+	var id int64
+	err := r.db.QueryRowContext(ctx, query, sql.Named("store", storeID), sql.Named("acc", accountID)).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, database.ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("repository: подключение магазина %d: %w", storeID, database.MapError(err))
+	}
+	return id, nil
+}
+
 // TouchContentSync запоминает время последней синхронизации каталога.
 func (r *StoreRepository) TouchContentSync(ctx context.Context, connectionID int64) error {
 	ctx, cancel := r.db.Context(ctx)

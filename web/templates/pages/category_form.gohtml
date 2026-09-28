@@ -1,0 +1,50 @@
+{{/* Кабинет продавца: создание и редактирование категории. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <h1 class="page-head__title">{{ if .IsNew }}{{ .L.T "categories.new_title" }}{{ else }}{{ .L.T "categories.edit_title" }}{{ end }}</h1>
+        </header>
+
+        <form class="form-card" method="post" action="{{ .Action }}" novalidate>
+            {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+            {{ range .Langs }}
+            <fieldset class="lang-block">
+                <legend>{{ .Name }}</legend>
+                <div class="field">
+                    <label class="field__label" for="name_{{ .Code }}">{{ $.L.T "categories.f_name" }}</label>
+                    <input class="input" id="name_{{ .Code }}" name="name_{{ .Code }}" type="text" maxlength="300" value="{{ .Title }}">
+                </div>
+                <div class="field">
+                    <label class="field__label" for="slug_{{ .Code }}">{{ $.L.T "categories.f_slug" }}</label>
+                    <input class="input" id="slug_{{ .Code }}" name="slug_{{ .Code }}" type="text" maxlength="160" value="{{ .Slug }}">
+                </div>
+            </fieldset>
+            {{ end }}
+
+            <div class="field">
+                <label class="field__label" for="parent">{{ .L.T "categories.f_parent" }}</label>
+                <select class="input" id="parent" name="parent">
+                    <option value="0">{{ .L.T "categories.no_parent" }}</option>
+                    {{ range .Parents }}<option value="{{ .ID }}"{{ if eq .ID $.ParentID }} selected{{ end }}>{{ .Name }}</option>{{ end }}
+                </select>
+            </div>
+            <div class="field">
+                <label class="field__label" for="sort">{{ .L.T "categories.f_sort" }}</label>
+                <input class="input" id="sort" name="sort" type="number" value="{{ .Sort }}">
+            </div>
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "categories.save" }}</button>
+            <p class="form-card__footer"><a href="{{ .CategoriesURL }}">{{ .L.T "categories.back" }}</a></p>
+        </form>
+
+        {{ if not .IsNew }}
+        <form class="form-card form-card--danger" method="post" action="{{ .DeleteAction }}">
+            <p class="muted small">{{ .L.T "categories.delete_hint" }}</p>
+            <button class="btn btn--ghost btn--block" type="submit">{{ .L.T "categories.delete" }}</button>
+        </form>
+        {{ end }}
+    </div>
+</section>
+{{ end }}

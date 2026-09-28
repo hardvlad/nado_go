@@ -1,0 +1,74 @@
+{{/* Кабинет продавца: список товаров магазина с фильтрами и переходом к карточке. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "catalog.title" }}{{ with .StoreName }} · {{ . }}{{ end }}</h1>
+            <span class="section-head__actions">
+                <a class="btn btn--ghost btn--sm" href="{{ .CategoriesURL }}">{{ .L.T "catalog.categories_link" }}</a>
+                <a class="btn btn--ghost btn--sm" href="{{ .AccountURL }}">{{ .L.T "catalog.to_account" }}</a>
+            </span>
+        </div>
+
+        <form class="orders-filter" method="get" action="{{ .FilterAction }}">
+            <input class="input" type="search" name="q" value="{{ .Query }}" placeholder="{{ .L.T `catalog.search_ph` }}" aria-label="{{ .L.T `catalog.search` }}">
+            <select class="input" name="category" aria-label="{{ .L.T `catalog.category` }}">
+                <option value="0">{{ .L.T "catalog.all_categories" }}</option>
+                {{ range .Categories }}<option value="{{ .ID }}"{{ if eq .ID $.CategoryID }} selected{{ end }}>{{ .Name }}</option>{{ end }}
+            </select>
+            <select class="input" name="status" aria-label="{{ .L.T `catalog.status` }}">
+                <option value="">{{ .L.T "catalog.all_statuses" }}</option>
+                {{ range .Statuses }}<option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>{{ end }}
+            </select>
+            <button class="btn btn--primary" type="submit">{{ .L.T "catalog.search" }}</button>
+        </form>
+
+        {{ if .Products }}
+        <p class="muted">{{ .L.T "catalog.count" "Count" .Total }}</p>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>{{ .L.T "catalog.col_title" }}</th>
+                        <th>{{ .L.T "catalog.col_category" }}</th>
+                        <th>{{ .L.T "catalog.col_status" }}</th>
+                        <th>{{ .L.T "catalog.col_price" }}</th>
+                        <th>{{ .L.T "catalog.col_stock" }}</th>
+                        <th>{{ .L.T "catalog.col_visible" }}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Products }}
+                    <tr>
+                        <td>{{ with .Image }}<img class="thumb" src="{{ img . }}" alt="" loading="lazy">{{ end }}</td>
+                        <td>{{ .Title }}</td>
+                        <td>{{ .CategoryName }}</td>
+                        <td><span class="badge badge--status">{{ $.L.T (printf "catalog.status_%s" .Status) }}</span></td>
+                        <td>{{ money .PriceMinor .Currency $.Lang }}{{ if eq .PriceMode "manual" }} <span class="muted small">{{ $.L.T "catalog.price_manual" }}</span>{{ end }}</td>
+                        <td>{{ .Qty }}</td>
+                        <td>{{ if .IsVisible }}<span class="badge badge--active">{{ $.L.T "catalog.visible_yes" }}</span>{{ else }}<span class="badge badge--muted">{{ $.L.T "catalog.visible_no" }}</span>{{ end }}</td>
+                        <td><a class="btn btn--ghost btn--sm" href="{{ $.ProductEditBase }}/{{ .ID }}/edit">{{ $.L.T "catalog.edit" }}</a></td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+
+        {{ if gt .TotalPages 1 }}
+        <nav class="pagination">
+            {{ range .PageNums }}
+                {{ if eq . $.Page }}<span class="is-current">{{ . }}</span>{{ else }}<a href="{{ $.PageBase }}{{ . }}">{{ . }}</a>{{ end }}
+            {{ end }}
+        </nav>
+        {{ end }}
+
+        {{ else if or .Query .Status (gt .CategoryID 0) }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "catalog.nothing_found") }}
+        {{ else }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "catalog.empty") }}
+        {{ end }}
+    </div>
+</section>
+{{ end }}

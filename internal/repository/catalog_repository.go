@@ -3,11 +3,27 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"nado_go/internal/database"
 	"nado_go/internal/model"
 )
+
+// parseOverrides разбирает JSON-массив имён переопределённых полей в множество.
+// Битый или пустой JSON — пустое множество (правки не защищаются, но и импорт
+// не падает).
+func parseOverrides(raw string) map[string]bool {
+	var list []string
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &list)
+	}
+	set := make(map[string]bool, len(list))
+	for _, f := range list {
+		set[f] = true
+	}
+	return set
+}
 
 // CatalogRepository — продаваемый каталог витрины (products/variants/offers).
 // Пишется построением из зеркала (BuildProduct) и читается витриной.
@@ -129,12 +145,19 @@ func (r *CatalogRepository) BuildProduct(ctx context.Context, in BuildProductInp
 	defer cancel()
 
 	err := r.db.WithTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx *sql.Tx) error {
-		// Товар.
+		// Товар. Поля, переопределённые продавцом в кабинете (overridden_fields),
+		// синхронизация не трогает: CASE оставляет прежнее значение, если токен поля
+		// есть в JSON-списке. Статус тоже под защитой — иначе повторный импорт
+		// вернул бы архивный/черновой товар в 'active'.
 		const mergeProduct = `
 			MERGE dbo.products WITH (HOLDLOCK) AS t
 			USING (SELECT @store AS store_id, @sku AS source_sku) AS s
 			ON t.store_id = s.store_id AND t.source_sku = s.source_sku
-			WHEN MATCHED THEN UPDATE SET category_id = @cat, brand = @brand, status = 'active', updated_at = SYSUTCDATETIME()
+			WHEN MATCHED THEN UPDATE SET
+				category_id = CASE WHEN EXISTS (SELECT 1 FROM OPENJSON(ISNULL(t.overridden_fields, '[]')) WHERE [value] = 'category') THEN t.category_id ELSE @cat END,
+				brand = CASE WHEN EXISTS (SELECT 1 FROM OPENJSON(ISNULL(t.overridden_fields, '[]')) WHERE [value] = 'brand') THEN t.brand ELSE @brand END,
+				status = CASE WHEN EXISTS (SELECT 1 FROM OPENJSON(ISNULL(t.overridden_fields, '[]')) WHERE [value] = 'status') THEN t.status ELSE 'active' END,
+				updated_at = SYSUTCDATETIME()
 			WHEN NOT MATCHED THEN INSERT (store_id, account_id, category_id, brand, source_sku, status)
 				VALUES (@store, @acc, @cat, @brand, @sku, 'active')
 			OUTPUT INSERTED.id;`
@@ -153,7 +176,16 @@ func (r *CatalogRepository) BuildProduct(ctx context.Context, in BuildProductInp
 			return database.MapError(err)
 		}
 
-		// Перевод.
+		// Какие поля продавец переопределил — их не перезаписываем.
+		var overridden string
+		if err := tx.QueryRowContext(ctx,
+			`SELECT ISNULL(overridden_fields, '[]') FROM dbo.products WHERE id = @pid;`,
+			sql.Named("pid", productID)).Scan(&overridden); err != nil {
+			return database.MapError(err)
+		}
+		ov := parseOverrides(overridden)
+
+		// Перевод — пропускаем целиком, если контент переопределён продавцом.
 		const mergeTr = `
 			MERGE dbo.product_translations WITH (HOLDLOCK) AS t
 			USING (SELECT @pid AS product_id, @lang AS lang) AS s
@@ -161,25 +193,29 @@ func (r *CatalogRepository) BuildProduct(ctx context.Context, in BuildProductInp
 			WHEN MATCHED THEN UPDATE SET title = @title, description = @descr, slug = @slug, seo_title = @seot, seo_description = @seod
 			WHEN NOT MATCHED THEN INSERT (product_id, store_id, lang, title, description, slug, seo_title, seo_description)
 				VALUES (@pid, @store, @lang, @title, @descr, @slug, @seot, @seod);`
-		if _, err := tx.ExecContext(ctx, mergeTr,
-			sql.Named("pid", productID), sql.Named("store", in.StoreID), sql.Named("lang", in.Lang),
-			sql.Named("title", in.Title), sql.Named("descr", nullString(in.Description)),
-			sql.Named("slug", in.Slug), sql.Named("seot", nullString(in.SEOTitle)),
-			sql.Named("seod", nullString(in.SEODesc))); err != nil {
-			return database.MapError(err)
+		if !ov["content"] {
+			if _, err := tx.ExecContext(ctx, mergeTr,
+				sql.Named("pid", productID), sql.Named("store", in.StoreID), sql.Named("lang", in.Lang),
+				sql.Named("title", in.Title), sql.Named("descr", nullString(in.Description)),
+				sql.Named("slug", in.Slug), sql.Named("seot", nullString(in.SEOTitle)),
+				sql.Named("seod", nullString(in.SEODesc))); err != nil {
+				return database.MapError(err)
+			}
 		}
 
-		// Изображения: перезаписываем целиком.
-		if _, err := tx.ExecContext(ctx, `DELETE FROM dbo.product_images WHERE product_id = @pid;`,
-			sql.Named("pid", productID)); err != nil {
-			return database.MapError(err)
-		}
-		for i, url := range in.Images {
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO dbo.product_images (product_id, store_id, url, sort) VALUES (@pid, @store, @url, @sort);`,
-				sql.Named("pid", productID), sql.Named("store", in.StoreID),
-				sql.Named("url", url), sql.Named("sort", i)); err != nil {
+		// Изображения: перезаписываем целиком, если продавец их не переопределил.
+		if !ov["images"] {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM dbo.product_images WHERE product_id = @pid;`,
+				sql.Named("pid", productID)); err != nil {
 				return database.MapError(err)
+			}
+			for i, url := range in.Images {
+				if _, err := tx.ExecContext(ctx,
+					`INSERT INTO dbo.product_images (product_id, store_id, url, sort) VALUES (@pid, @store, @url, @sort);`,
+					sql.Named("pid", productID), sql.Named("store", in.StoreID),
+					sql.Named("url", url), sql.Named("sort", i)); err != nil {
+					return database.MapError(err)
+				}
 			}
 		}
 

@@ -1,0 +1,124 @@
+{{/* Кабинет продавца: карточка товара — контент по всем языкам, изображения,
+     цена и видимость. Правки товаров из Kaspi защищаются от перезаписи. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--wide">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "catalog.product_title" }}</h1>
+            <a class="btn btn--ghost btn--sm" href="{{ .CatalogURL }}">{{ .L.T "catalog.back_to_list" }}</a>
+        </div>
+
+        {{ if .Saved }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "catalog.saved") }}{{ end }}
+        {{ if .Reset }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "catalog.reset_done") }}{{ end }}
+        {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+        {{ if .FromKaspi }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "catalog.kaspi_note") }}
+        {{ end }}
+
+        <div class="edit-grid">
+            <form class="form-card" method="post" action="{{ .Action }}" novalidate>
+                <h2 class="form-card__title">{{ .L.T "catalog.content" }}</h2>
+
+                {{ range .Langs }}
+                <fieldset class="lang-block">
+                    <legend>{{ .Name }}</legend>
+                    <div class="field">
+                        <label class="field__label" for="title_{{ .Code }}">{{ $.L.T "catalog.f_title" }}</label>
+                        <input class="input" id="title_{{ .Code }}" name="title_{{ .Code }}" type="text" maxlength="1000" value="{{ .Title }}">
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="description_{{ .Code }}">{{ $.L.T "catalog.f_description" }}</label>
+                        <textarea class="input" id="description_{{ .Code }}" name="description_{{ .Code }}" rows="5">{{ .Description }}</textarea>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="slug_{{ .Code }}">{{ $.L.T "catalog.f_slug" }}</label>
+                        <input class="input" id="slug_{{ .Code }}" name="slug_{{ .Code }}" type="text" maxlength="200" value="{{ .Slug }}">
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="seo_title_{{ .Code }}">{{ $.L.T "catalog.f_seo_title" }}</label>
+                        <input class="input" id="seo_title_{{ .Code }}" name="seo_title_{{ .Code }}" type="text" maxlength="300" value="{{ .SEOTitle }}">
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="seo_description_{{ .Code }}">{{ $.L.T "catalog.f_seo_desc" }}</label>
+                        <input class="input" id="seo_description_{{ .Code }}" name="seo_description_{{ .Code }}" type="text" maxlength="600" value="{{ .SEODesc }}">
+                    </div>
+                </fieldset>
+                {{ end }}
+
+                <div class="field">
+                    <label class="field__label" for="category">{{ .L.T "catalog.f_category" }}</label>
+                    <select class="input" id="category" name="category">
+                        <option value="0">{{ .L.T "catalog.no_category" }}</option>
+                        {{ range .Categories }}<option value="{{ .ID }}"{{ if eq .ID $.Product.CategoryID }} selected{{ end }}>{{ .Name }}</option>{{ end }}
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field__label" for="brand">{{ .L.T "catalog.f_brand" }}</label>
+                    <input class="input" id="brand" name="brand" type="text" maxlength="300" value="{{ .Product.Brand }}">
+                </div>
+                <div class="field">
+                    <label class="field__label" for="status">{{ .L.T "catalog.f_status" }}</label>
+                    <select class="input" id="status" name="status">
+                        {{ range .Statuses }}<option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>{{ end }}
+                    </select>
+                </div>
+
+                <fieldset class="lang-block">
+                    <legend>{{ .L.T "catalog.images" }}</legend>
+                    <p class="field__hint">{{ .L.T "catalog.images_hint" }}</p>
+                    {{ range .Images }}
+                    <input class="input input--mb" name="image" type="url" maxlength="1000" value="{{ . }}">
+                    {{ end }}
+                    <input class="input input--mb" name="image" type="url" maxlength="1000" placeholder="https://…">
+                    <input class="input input--mb" name="image" type="url" maxlength="1000" placeholder="https://…">
+                    <input class="input input--mb" name="image" type="url" maxlength="1000" placeholder="https://…">
+                </fieldset>
+
+                <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "catalog.save_content" }}</button>
+            </form>
+
+            <aside class="edit-aside">
+                <form class="form-card" method="post" action="{{ .PriceAction }}" novalidate>
+                    <h2 class="form-card__title">{{ .L.T "catalog.price_block" }}</h2>
+                    <p class="muted small">{{ .L.T "catalog.source_price" }}: {{ .SourcePrice }}</p>
+                    <p class="muted small">{{ .L.T "catalog.offer_price" }}: {{ .OfferPrice }}</p>
+
+                    <div class="field field--check">
+                        <label class="check"><input type="radio" name="price_mode" value="rule"{{ if ne .Product.PriceMode "manual" }} checked{{ end }}> <span>{{ .L.T "catalog.mode_rule" }}</span></label>
+                    </div>
+                    <div class="field field--check">
+                        <label class="check"><input type="radio" name="price_mode" value="manual"{{ if eq .Product.PriceMode "manual" }} checked{{ end }}> <span>{{ .L.T "catalog.mode_manual" }}</span></label>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="price">{{ .L.T "catalog.manual_price" }}</label>
+                        <input class="input" id="price" name="price" type="text" inputmode="decimal" value="{{ .ManualPriceInput }}" placeholder="0">
+                    </div>
+                    <div class="field field--check">
+                        <label class="check"><input type="checkbox" name="visible" value="1"{{ if .Product.IsVisible }} checked{{ end }}> <span>{{ .L.T "catalog.visible" }}</span></label>
+                    </div>
+                    <button class="btn btn--primary btn--block" type="submit">{{ .L.T "catalog.save_price" }}</button>
+                </form>
+
+                {{ if .FromKaspi }}
+                <div class="form-card">
+                    <h2 class="form-card__title">{{ .L.T "catalog.overrides_title" }}</h2>
+                    {{ $any := false }}
+                    {{ range $field := (list "content" "category" "brand" "status" "images") }}
+                        {{ if index $.Overridden $field }}
+                        {{ $any = true }}
+                        <form class="reset-row" method="post" action="{{ $.ResetAction }}">
+                            <span>{{ $.L.T (printf "catalog.override_%s" $field) }}</span>
+                            <input type="hidden" name="field" value="{{ $field }}">
+                            <button class="btn btn--ghost btn--sm" type="submit">{{ $.L.T "catalog.reset_field" }}</button>
+                        </form>
+                        {{ end }}
+                    {{ end }}
+                    {{ if not $any }}<p class="muted small">{{ .L.T "catalog.no_overrides" }}</p>{{ end }}
+                </div>
+                {{ end }}
+            </aside>
+        </div>
+    </div>
+</section>
+{{ end }}

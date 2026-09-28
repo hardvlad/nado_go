@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"nado_go/internal/config"
@@ -213,6 +215,10 @@ func New(ctx context.Context, version string) (*App, error) {
 	cartRepo := repository.NewCartRepository(db)
 	orderService := service.NewOrderService(repository.NewOrderRepository(db), cartRepo)
 
+	// Редактирование каталога из кабинета (категории и товары, D-14/D-23).
+	catalogEdit := service.NewCatalogEditService(
+		repository.NewCatalogRepository(db), repository.NewStoreRepository(db), jobsRepo, log)
+
 	pages := web.NewPageHandler(web.Deps{
 		Render:        renderer,
 		I18n:          bundle,
@@ -222,6 +228,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		Connections:   connService,
 		Onboarding:    onboardingService,
 		StoreOrders:   orderService,
+		Catalog:       catalogEdit,
 		Feedback:      feedbackService,
 		SecureCookies: cfg.IsProduction(),
 		PublicURL:     cfg.App.PublicURL,
@@ -551,8 +558,23 @@ func newRenderer(cfg *config.Config, version string) (*view.Renderer, error) {
 		return nil, fmt.Errorf("app: шаблоны: %w", err)
 	}
 
+	// img дописывает CDN-префикс к относительным ссылкам изображений Kaspi при
+	// показе (в базе они хранятся как есть) — как в рендере витрины.
+	imageCDN := strings.TrimRight(cfg.Kaspi.ImagesCDNURL, "/")
 	return view.New(templatesFS,
 		view.WithDebug(cfg.App.Debug),
+		view.WithFuncs(template.FuncMap{
+			"img": func(path string) string {
+				if path == "" || imageCDN == "" ||
+					strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "//") {
+					return path
+				}
+				if strings.HasPrefix(path, "/") {
+					return imageCDN + path
+				}
+				return imageCDN + "/" + path
+			},
+		}),
 		// Переменные, доступные на каждой странице без явной передачи.
 		view.WithGlobals(map[string]any{
 			"AppName": cfg.App.Name,

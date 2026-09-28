@@ -46,7 +46,11 @@
                             {{ else }}{{ $.L.T "account.store_orders_synced" "At" (formatDate "02.01.2006 15:04" .OrdersSyncAt) }}{{ end }}
                         </p>
                         {{ end }}
-                        <p class="store-card__actions"><a href="{{ .EditURL }}">{{ $.L.T "account.store_edit" }}</a></p>
+                        <p class="store-card__actions">
+                            <a href="{{ .CatalogURL }}">{{ $.L.T "account.store_catalog" }}</a>
+                            <a href="{{ .CategoriesURL }}">{{ $.L.T "account.store_categories" }}</a>
+                            <a href="{{ .EditURL }}">{{ $.L.T "account.store_edit" }}</a>
+                        </p>
                     </li>
                     {{ end }}
                 </ul>

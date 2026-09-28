@@ -303,10 +303,13 @@ func (h *PageHandler) Account(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		for _, s := range stores {
+			idStr := strconv.FormatInt(s.ID, 10)
 			cards = append(cards, StoreCard{
-				Store:   s,
-				URL:     h.storeURL(s.Slug),
-				EditURL: i18n.Localize(l.Lang(), "/stores/"+strconv.FormatInt(s.ID, 10)+"/edit"),
+				Store:         s,
+				URL:           h.storeURL(s.Slug),
+				EditURL:       i18n.Localize(l.Lang(), "/stores/"+idStr+"/edit"),
+				CatalogURL:    i18n.Localize(l.Lang(), "/stores/"+idStr+"/catalog"),
+				CategoriesURL: i18n.Localize(l.Lang(), "/stores/"+idStr+"/categories"),
 			})
 		}
 	}
@@ -323,8 +326,10 @@ func (h *PageHandler) Account(w http.ResponseWriter, r *http.Request) error {
 // StoreCard — магазин с готовыми ссылками для кабинета.
 type StoreCard struct {
 	model.Store
-	URL     string // адрес витрины (кликабельная ссылка)
-	EditURL string // адрес формы редактирования
+	URL           string // адрес витрины (кликабельная ссылка)
+	EditURL       string // адрес формы редактирования
+	CatalogURL    string // список товаров магазина
+	CategoriesURL string // управление категориями
 }
 
 // storeURL строит адрес витрины: в проде поддомен, локально — префикс /shop/{slug}.
