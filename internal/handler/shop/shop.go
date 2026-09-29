@@ -53,7 +53,8 @@ type OrderOps interface {
 
 // PaymentOps — приём оплаты заказа (реализуется service.PaymentService).
 type PaymentOps interface {
-	StartOrderPayment(ctx context.Context, accountID, storeID int64, order *model.Order, origin, successURL, failURL string) (*service.StartResult, error)
+	EnabledStoreMethods(ctx context.Context, accountID, storeID int64) ([]service.PaymentMethodView, error)
+	StartOrderPayment(ctx context.Context, accountID, storeID int64, order *model.Order, provider, origin, successURL, failURL string) (*service.StartResult, error)
 	ConfirmDevOrder(ctx context.Context, accountID, storeID int64, ref string) error
 }
 

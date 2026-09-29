@@ -28,31 +28,24 @@ type Config struct {
 	Payments  Payments
 }
 
-// Payments — приём онлайн-оплат. Магазины подключают свой мерчант в кабинете;
-// здесь только значения по умолчанию и мерчант самой платформы для подписки.
+// Payments — приём онлайн-оплат. Магазины подключают свои мерчанты в кабинете
+// (несколько провайдеров одновременно); здесь — длительность подписки и мерчанты
+// самой платформы по провайдерам (продавец выбирает, чем оплатить подписку).
 type Payments struct {
-	// DefaultProvider — провайдер по умолчанию для новых магазинов (dev|freedompay|kaspi).
-	DefaultProvider string
 	// SubscriptionDays — длительность оплачиваемого периода подписки.
 	SubscriptionDays int
-	// Мерчант платформы для приёма оплаты подписки продавцами.
-	PlatformProvider     string
-	PlatformMerchantID   string
-	PlatformSecret       string
-	PlatformTerminal     string
-	PlatformTesting      bool
-	PlatformWebhookToken string // секрет в пути вебхука подписки
+	// Platform — мерчанты платформы по провайдерам (из PLATFORM_PAY_PROVIDERS).
+	Platform []PlatformMethod
 }
 
-// PlatformPayEnabled — включён ли приём оплаты подписки картой (иначе — по счёту).
-func (p Payments) PlatformPayEnabled() bool {
-	if p.PlatformProvider == "" {
-		return false
-	}
-	if p.PlatformProvider == "dev" {
-		return true
-	}
-	return p.PlatformMerchantID != "" && p.PlatformSecret != "" && p.PlatformWebhookToken != ""
+// PlatformMethod — мерчант платформы для одного провайдера (оплата подписки).
+type PlatformMethod struct {
+	Provider     string
+	MerchantID   string
+	Secret       string
+	Terminal     string
+	Testing      bool
+	WebhookToken string
 }
 
 // Catalog — регулярная переимпортация каталога и заказов из кабинетов/API.
@@ -247,14 +240,8 @@ func Load() (*Config, error) {
 			OrdersSyncInterval: time.Duration(envInt("KASPI_ORDERS_SYNC_INTERVAL", 900)) * time.Second,
 		},
 		Payments: Payments{
-			DefaultProvider:      env("PAY_DEFAULT_PROVIDER", "dev"),
-			SubscriptionDays:     envInt("SUBSCRIPTION_DAYS", 30),
-			PlatformProvider:     env("PLATFORM_PAY_PROVIDER", "dev"),
-			PlatformMerchantID:   env("PLATFORM_PAY_MERCHANT_ID", ""),
-			PlatformSecret:       env("PLATFORM_PAY_SECRET", ""),
-			PlatformTerminal:     env("PLATFORM_PAY_TERMINAL", ""),
-			PlatformTesting:      envBool("PLATFORM_PAY_TESTING", false),
-			PlatformWebhookToken: env("PLATFORM_PAY_WEBHOOK_TOKEN", ""),
+			SubscriptionDays: envInt("SUBSCRIPTION_DAYS", 30),
+			Platform:         loadPlatformMethods(),
 		},
 	}
 
@@ -271,6 +258,29 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) IsProduction() bool { return strings.EqualFold(c.App.Env, "prod") }
+
+// loadPlatformMethods собирает мерчантов платформы для оплаты подписки из
+// PLATFORM_PAY_PROVIDERS (список кодов) и переменных PLATFORM_<PROVIDER>_*.
+func loadPlatformMethods() []PlatformMethod {
+	codes := envList("PLATFORM_PAY_PROVIDERS", []string{"dev"})
+	out := make([]PlatformMethod, 0, len(codes))
+	for _, code := range codes {
+		code = strings.ToLower(strings.TrimSpace(code))
+		if code == "" {
+			continue
+		}
+		p := strings.ToUpper(code)
+		out = append(out, PlatformMethod{
+			Provider:     code,
+			MerchantID:   env("PLATFORM_"+p+"_MERCHANT_ID", ""),
+			Secret:       env("PLATFORM_"+p+"_SECRET", ""),
+			Terminal:     env("PLATFORM_"+p+"_TERMINAL", ""),
+			Testing:      envBool("PLATFORM_"+p+"_TESTING", false),
+			WebhookToken: env("PLATFORM_"+p+"_WEBHOOK_TOKEN", ""),
+		})
+	}
+	return out
+}
 
 // devSecretsKey — ключ для локальной разработки, когда SECRETS_KEY не задан.
 // Только вне prod: зашифрованное им в dev-базе не имеет ценности.

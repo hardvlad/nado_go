@@ -25,7 +25,7 @@ var (
 	ErrSubscriptionNoPay = errors.New("service: оплата подписки картой не настроена")
 )
 
-// PlatformPay — мерчант платформы для оплаты подписки продавцами.
+// PlatformPay — мерчант платформы для приёма оплаты подписки по одному провайдеру.
 type PlatformPay struct {
 	Provider     string
 	MerchantID   string
@@ -35,15 +35,16 @@ type PlatformPay struct {
 	WebhookToken string
 }
 
-// PaymentConfig — параметры слоя оплат, не зависящие от запроса.
+// PaymentConfig — параметры слоя оплат, не зависящие от запроса. Platform —
+// мерчанты платформы по провайдерам (продавец выбирает, чем платить подписку).
 type PaymentConfig struct {
-	DefaultProvider  string
 	SubscriptionDays int
-	Platform         PlatformPay
+	Platform         map[string]PlatformPay
 }
 
 // PaymentService оркестрирует приём оплат: заказов витрины (деньги покупателя →
 // мерчант продавца) и подписки платформе (деньги продавца → мерчант nado).
+// У магазина может быть несколько активных методов; покупатель выбирает способ.
 type PaymentService struct {
 	payments *repository.PaymentRepository
 	orders   *repository.OrderRepository
@@ -58,11 +59,20 @@ func NewPaymentService(payments *repository.PaymentRepository, orders *repositor
 	if cfg.SubscriptionDays <= 0 {
 		cfg.SubscriptionDays = 30
 	}
+	if cfg.Platform == nil {
+		cfg.Platform = map[string]PlatformPay{}
+	}
 	return &PaymentService{payments: payments, orders: orders, box: box, reg: reg, plans: plans, cfg: cfg, log: log}
 }
 
-// Providers — коды доступных провайдеров (для выбора в кабинете).
+// Providers — все коды провайдеров реестра (для добавления методов в кабинете).
 func (s *PaymentService) Providers() []string { return s.reg.Codes() }
+
+// providerNeedsCreds — провайдеру нужны реквизиты мерчанта (не dev/kaspi).
+func providerNeedsCreds(provider string) bool { return provider == "freedompay" || provider == "halyk" }
+
+// providerNeedsTerminal — провайдеру нужен терминал (Halyk ePay).
+func providerNeedsTerminal(provider string) bool { return provider == "halyk" }
 
 // StartResult — что делать витрине после инициализации платежа.
 type StartResult struct {
@@ -74,37 +84,90 @@ type StartResult struct {
 	RefToken    string
 }
 
-// --- Настройки оплаты магазина ---
+// --- Методы оплаты магазина ---
 
-// StoreSettingsView — настройки оплаты магазина для кабинета (без секрета).
-type StoreSettingsView struct {
-	Provider     string
-	IsEnabled    bool
-	MerchantID   string
-	Terminal     string
-	Testing      bool
-	HasSecret    bool
-	WebhookToken string
+// PaymentMethodView — метод оплаты магазина для кабинета/витрины (без секрета).
+type PaymentMethodView struct {
+	Provider      string
+	Configured    bool // строка метода существует
+	IsEnabled     bool
+	MerchantID    string
+	Terminal      string
+	Testing       bool
+	HasSecret     bool
+	NeedsCreds    bool
+	NeedsTerminal bool
+	WebhookToken  string
 }
 
-// StoreSettings возвращает настройки оплаты магазина (значения по умолчанию, если
-// ещё не заданы).
-func (s *PaymentService) StoreSettings(ctx context.Context, accountID, storeID int64) (*StoreSettingsView, error) {
-	set, err := s.payments.GetStorePaymentSettings(ctx, accountID, storeID)
+// StoreMethods возвращает все провайдеры реестра с текущими настройками метода
+// магазина (для раздела управления методами в кабинете).
+func (s *PaymentService) StoreMethods(ctx context.Context, accountID, storeID int64) ([]PaymentMethodView, error) {
+	rows, err := s.payments.ListStorePaymentMethods(ctx, accountID, storeID)
 	if err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
-	if set == nil {
-		return &StoreSettingsView{Provider: s.cfg.DefaultProvider}, nil
+	byProvider := make(map[string]repository.StorePaymentMethod, len(rows))
+	for _, m := range rows {
+		byProvider[m.Provider] = m
 	}
-	return &StoreSettingsView{
-		Provider: set.Provider, IsEnabled: set.IsEnabled, MerchantID: set.MerchantID, Terminal: set.Terminal,
-		Testing: set.Testing, HasSecret: set.HasSecret, WebhookToken: set.WebhookToken,
-	}, nil
+	var out []PaymentMethodView
+	for _, code := range s.reg.Codes() {
+		v := PaymentMethodView{Provider: code, NeedsCreds: providerNeedsCreds(code), NeedsTerminal: providerNeedsTerminal(code)}
+		if m, ok := byProvider[code]; ok {
+			v.Configured = true
+			v.IsEnabled = m.IsEnabled
+			v.MerchantID = m.MerchantID
+			v.Terminal = m.Terminal
+			v.Testing = m.Testing
+			v.HasSecret = m.HasSecret
+			v.WebhookToken = m.WebhookToken
+		}
+		out = append(out, v)
+	}
+	return out, nil
 }
 
-// SaveStoreSettingsInput — ввод формы настроек оплаты магазина.
-type SaveStoreSettingsInput struct {
+// EnabledStoreMethods возвращает включённые методы оплаты магазина (для выбора
+// покупателем). Провайдеры без нужных реквизитов исключаются.
+func (s *PaymentService) EnabledStoreMethods(ctx context.Context, accountID, storeID int64) ([]PaymentMethodView, error) {
+	all, err := s.StoreMethods(ctx, accountID, storeID)
+	if err != nil {
+		return nil, err
+	}
+	var out []PaymentMethodView
+	for _, m := range all {
+		if m.IsEnabled && (!m.NeedsCreds || m.HasSecret) {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+// MethodForEdit возвращает метод оплаты для формы (пустой, если ещё не подключён).
+func (s *PaymentService) MethodForEdit(ctx context.Context, accountID, storeID int64, provider string) (*PaymentMethodView, error) {
+	if _, ok := s.reg.Get(provider); !ok {
+		return nil, ErrPaymentProvider
+	}
+	m, err := s.payments.GetStorePaymentMethod(ctx, accountID, storeID, provider)
+	if err != nil {
+		return nil, httpx.ErrInternal(err)
+	}
+	v := &PaymentMethodView{Provider: provider, NeedsCreds: providerNeedsCreds(provider), NeedsTerminal: providerNeedsTerminal(provider)}
+	if m != nil {
+		v.Configured = true
+		v.IsEnabled = m.IsEnabled
+		v.MerchantID = m.MerchantID
+		v.Terminal = m.Terminal
+		v.Testing = m.Testing
+		v.HasSecret = m.HasSecret
+		v.WebhookToken = m.WebhookToken
+	}
+	return v, nil
+}
+
+// SaveMethodInput — ввод формы метода оплаты.
+type SaveMethodInput struct {
 	Provider   string
 	IsEnabled  bool
 	MerchantID string
@@ -113,18 +176,17 @@ type SaveStoreSettingsInput struct {
 	Testing    bool
 }
 
-// SaveStoreSettings сохраняет настройки оплаты магазина. Секрет шифруется; токен
-// вебхука генерируется при первом сохранении онлайн-провайдера.
-func (s *PaymentService) SaveStoreSettings(ctx context.Context, accountID, storeID int64, in SaveStoreSettingsInput) error {
+// SaveMethod создаёт или обновляет метод оплаты магазина. Секрет шифруется; токен
+// вебхука генерируется один раз.
+func (s *PaymentService) SaveMethod(ctx context.Context, accountID, storeID int64, in SaveMethodInput) error {
 	if _, ok := s.reg.Get(in.Provider); !ok {
 		return ErrPaymentProvider
 	}
-	cur, err := s.payments.GetStorePaymentSettings(ctx, accountID, storeID)
+	cur, err := s.payments.GetStorePaymentMethod(ctx, accountID, storeID, in.Provider)
 	if err != nil {
 		return httpx.ErrInternal(err)
 	}
-
-	save := repository.SaveStorePaymentSettingsInput{
+	save := repository.SaveStorePaymentMethodInput{
 		StoreID: storeID, AccountID: accountID, Provider: in.Provider,
 		IsEnabled: in.IsEnabled, MerchantID: strings.TrimSpace(in.MerchantID),
 		Terminal: strings.TrimSpace(in.Terminal), Testing: in.Testing,
@@ -137,12 +199,19 @@ func (s *PaymentService) SaveStoreSettings(ctx context.Context, accountID, store
 		save.SecretCiphertext = cipher
 		save.UpdateSecret = true
 	}
-	// Токен вебхука нужен онлайн-провайдерам; генерируем один раз и сохраняем.
 	if cur == nil || cur.WebhookToken == "" {
 		save.WebhookToken = randToken(24)
 		save.UpdateToken = true
 	}
-	if err := s.payments.SaveStorePaymentSettings(ctx, save); err != nil {
+	if err := s.payments.SaveStorePaymentMethod(ctx, save); err != nil {
+		return httpx.ErrInternal(err)
+	}
+	return nil
+}
+
+// DeleteMethod удаляет метод оплаты магазина.
+func (s *PaymentService) DeleteMethod(ctx context.Context, accountID, storeID int64, provider string) error {
+	if err := s.payments.DeleteStorePaymentMethod(ctx, accountID, storeID, provider); err != nil {
 		return httpx.ErrInternal(err)
 	}
 	return nil
@@ -150,17 +219,17 @@ func (s *PaymentService) SaveStoreSettings(ctx context.Context, accountID, store
 
 // --- Оплата заказа витрины ---
 
-// StartOrderPayment создаёт платёж за заказ и возвращает, куда отправить покупателя.
-// successURL/failURL/origin строит вызывающая витрина (знает хост и префикс).
-func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, storeID int64, order *model.Order, origin, successURL, failURL string) (*StartResult, error) {
-	set, err := s.payments.GetStorePaymentSettings(ctx, accountID, storeID)
+// StartOrderPayment создаёт платёж за заказ выбранным провайдером и возвращает,
+// куда отправить покупателя. successURL/failURL/origin строит витрина.
+func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, storeID int64, order *model.Order, provider, origin, successURL, failURL string) (*StartResult, error) {
+	m, err := s.payments.GetStorePaymentMethod(ctx, accountID, storeID, provider)
 	if err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
-	if set == nil || !set.IsEnabled {
+	if m == nil || !m.IsEnabled || (providerNeedsCreds(provider) && !m.HasSecret) {
 		return nil, ErrPaymentsDisabled
 	}
-	prov, ok := s.reg.Get(set.Provider)
+	prov, ok := s.reg.Get(provider)
 	if !ok {
 		return nil, ErrPaymentProvider
 	}
@@ -168,16 +237,16 @@ func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, store
 	ref := "o-" + randToken(24)
 	if _, err := s.payments.CreatePayment(ctx, repository.NewPayment{
 		AccountID: accountID, StoreID: storeID, Purpose: "order", OrderID: order.ID,
-		Provider: set.Provider, RefToken: ref, AmountMinor: order.TotalMinor, Currency: order.Currency,
+		Provider: provider, RefToken: ref, AmountMinor: order.TotalMinor, Currency: order.Currency,
 	}); err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
 
-	creds, err := s.credsFor(set)
+	creds, err := s.credsFor(m)
 	if err != nil {
 		return nil, err
 	}
-	callback := origin + "/webhooks/payment/" + set.Provider + "/" + set.WebhookToken
+	callback := origin + "/webhooks/payment/" + provider + "/" + m.WebhookToken
 	res, err := prov.Start(ctx, payment.StartInput{
 		Ref: ref, AmountMinor: order.TotalMinor, Currency: order.Currency,
 		Description: fmt.Sprintf("Заказ №%d", order.Number),
@@ -185,7 +254,7 @@ func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, store
 		SuccessURL: successURL, FailURL: failURL, CallbackURL: callback, Creds: creds,
 	})
 	if err != nil {
-		s.log.Warn("оплата заказа: провайдер отклонил инициализацию", slog.Int64("store_id", storeID), slog.Any("error", err))
+		s.log.Warn("оплата заказа: провайдер отклонил инициализацию", slog.Int64("store_id", storeID), slog.String("provider", provider), slog.Any("error", err))
 		return nil, httpx.ErrInternal(err)
 	}
 	if res.ProviderRef != "" {
@@ -194,12 +263,11 @@ func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, store
 	return &StartResult{
 		RedirectURL: res.RedirectURL, Widget: res.Widget,
 		Local:  res.RedirectURL == "" && res.Widget == nil,
-		Manual: prov.Manual(), Provider: set.Provider, RefToken: ref,
+		Manual: prov.Manual(), Provider: provider, RefToken: ref,
 	}, nil
 }
 
-// ConfirmDevOrder подтверждает платёж dev-провайдера (кнопка на локальной странице
-// оплаты). Только для провайдера dev.
+// ConfirmDevOrder подтверждает платёж dev-провайдера (кнопка на локальной странице).
 func (s *PaymentService) ConfirmDevOrder(ctx context.Context, accountID, storeID int64, ref string) error {
 	p, err := s.payments.GetPaymentByRef(ctx, ref)
 	if errors.Is(err, database.ErrNotFound) {
@@ -216,41 +284,64 @@ func (s *PaymentService) ConfirmDevOrder(ctx context.Context, accountID, storeID
 
 // --- Оплата подписки платформе ---
 
-// StartSubscriptionPayment создаёт платёж за подписку и возвращает, куда отправить
-// продавца.
-func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID int64, planCode, origin, successURL, failURL string) (*StartResult, error) {
-	if !s.platformPayEnabled() {
+// PlatformMethod — доступный способ оплаты подписки (для выбора продавцом).
+type PlatformMethod struct {
+	Provider string
+	Manual   bool
+}
+
+// PlatformMethods возвращает доступные способы оплаты подписки в порядке кодов.
+func (s *PaymentService) PlatformMethods() []PlatformMethod {
+	var out []PlatformMethod
+	for _, code := range s.reg.Codes() {
+		pp, ok := s.cfg.Platform[code]
+		if !ok || !platformAvailable(code, pp) {
+			continue
+		}
+		prov, _ := s.reg.Get(code)
+		out = append(out, PlatformMethod{Provider: code, Manual: prov != nil && prov.Manual()})
+	}
+	return out
+}
+
+// PlatformPayEnabled — доступен ли хотя бы один способ оплаты подписки.
+func (s *PaymentService) PlatformPayEnabled() bool { return len(s.PlatformMethods()) > 0 }
+
+// StartSubscriptionPayment создаёт платёж за подписку выбранным провайдером.
+func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID int64, planCode, provider, origin, successURL, failURL string) (*StartResult, error) {
+	pp, ok := s.cfg.Platform[provider]
+	if !ok || !platformAvailable(provider, pp) {
 		return nil, ErrSubscriptionNoPay
 	}
 	plan, ok := s.plans.Get(planCode)
 	if !ok {
 		return nil, httpx.ErrBadRequest("Неизвестный тариф")
 	}
-	prov, ok := s.reg.Get(s.cfg.Platform.Provider)
+	prov, ok := s.reg.Get(provider)
 	if !ok {
 		return nil, ErrPaymentProvider
 	}
 
 	ref := "s-" + randToken(24)
 	if _, err := s.payments.CreatePayment(ctx, repository.NewPayment{
-		AccountID: accountID, Purpose: "subscription", Provider: s.cfg.Platform.Provider,
+		AccountID: accountID, Purpose: "subscription", Provider: provider,
 		RefToken: ref, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
 		PlanCode: planCode, PeriodDays: s.cfg.SubscriptionDays,
 	}); err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
 
-	callback := origin + "/webhooks/payment/" + s.cfg.Platform.Provider + "/" + s.cfg.Platform.WebhookToken
+	callback := origin + "/webhooks/payment/" + provider + "/" + pp.WebhookToken
 	res, err := prov.Start(ctx, payment.StartInput{
 		Ref: ref, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
 		Description: "Подписка nado: тариф " + planCode,
 		SuccessURL:  successURL, FailURL: failURL, CallbackURL: callback,
-		Creds: payment.Credentials{MerchantID: s.cfg.Platform.MerchantID, Secret: s.cfg.Platform.Secret, Terminal: s.cfg.Platform.Terminal, Testing: s.cfg.Platform.Testing},
+		Creds: payment.Credentials{MerchantID: pp.MerchantID, Secret: pp.Secret, Terminal: pp.Terminal, Testing: pp.Testing},
 	})
 	if err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
-	return &StartResult{RedirectURL: res.RedirectURL, Widget: res.Widget, Local: res.RedirectURL == "" && res.Widget == nil, Manual: prov.Manual(), Provider: s.cfg.Platform.Provider, RefToken: ref}, nil
+	return &StartResult{RedirectURL: res.RedirectURL, Widget: res.Widget, Local: res.RedirectURL == "" && res.Widget == nil, Manual: prov.Manual(), Provider: provider, RefToken: ref}, nil
 }
 
 // ConfirmDevSubscription подтверждает платёж подписки dev-провайдером.
@@ -277,22 +368,19 @@ func (s *PaymentService) Subscription(ctx context.Context, accountID int64) (*re
 	return sub, nil
 }
 
-// PlatformPayEnabled — можно ли оплатить подписку картой.
-func (s *PaymentService) PlatformPayEnabled() bool { return s.platformPayEnabled() }
-
 // --- Вебхуки ---
 
 // HandleWebhook обрабатывает входящий вебхук провайдера. token различает получателя:
-// токен подписки платформы → подписка, иначе — по настройкам магазина.
+// токен подписки платформы этого провайдера → подписка, иначе — метод магазина.
 func (s *PaymentService) HandleWebhook(ctx context.Context, provider, token string, r *http.Request) (contentType string, body []byte, err error) {
 	prov, ok := s.reg.Get(provider)
 	if !ok {
 		return "", nil, ErrPaymentProvider
 	}
 
-	// Подписка платформы.
-	if s.cfg.Platform.WebhookToken != "" && provider == s.cfg.Platform.Provider && token == s.cfg.Platform.WebhookToken {
-		creds := payment.Credentials{MerchantID: s.cfg.Platform.MerchantID, Secret: s.cfg.Platform.Secret, Terminal: s.cfg.Platform.Terminal, Testing: s.cfg.Platform.Testing}
+	// Подписка платформы (мерчант платформы для этого провайдера).
+	if pp, ok := s.cfg.Platform[provider]; ok && pp.WebhookToken != "" && token == pp.WebhookToken {
+		creds := payment.Credentials{MerchantID: pp.MerchantID, Secret: pp.Secret, Terminal: pp.Terminal, Testing: pp.Testing}
 		cb, perr := prov.ParseCallback(r, creds)
 		if perr != nil {
 			ct, b := prov.CallbackResponse(false)
@@ -310,15 +398,15 @@ func (s *PaymentService) HandleWebhook(ctx context.Context, provider, token stri
 		return ct, b, nil
 	}
 
-	// Оплата заказа магазина.
-	set, rerr := s.payments.ResolveStorePaymentByToken(ctx, provider, token)
+	// Оплата заказа магазина (метод по токену).
+	m, rerr := s.payments.ResolveStoreMethodByToken(ctx, provider, token)
 	if errors.Is(rerr, database.ErrNotFound) {
 		return "", nil, ErrPaymentNotFound
 	}
 	if rerr != nil {
 		return "", nil, httpx.ErrInternal(rerr)
 	}
-	creds, cerr := s.credsFor(set)
+	creds, cerr := s.credsFor(m)
 	if cerr != nil {
 		return "", nil, cerr
 	}
@@ -372,10 +460,10 @@ func (s *PaymentService) settleSubscription(ctx context.Context, p *repository.P
 	return s.payments.ActivateSubscription(ctx, updated.AccountID, updated.PlanCode, until)
 }
 
-func (s *PaymentService) credsFor(set *repository.StorePaymentSettings) (payment.Credentials, error) {
-	creds := payment.Credentials{MerchantID: set.MerchantID, Terminal: set.Terminal, Testing: set.Testing}
-	if len(set.SecretCiphertext) > 0 {
-		secret, err := s.box.DecryptString(set.SecretCiphertext)
+func (s *PaymentService) credsFor(m *repository.StorePaymentMethod) (payment.Credentials, error) {
+	creds := payment.Credentials{MerchantID: m.MerchantID, Terminal: m.Terminal, Testing: m.Testing}
+	if len(m.SecretCiphertext) > 0 {
+		secret, err := s.box.DecryptString(m.SecretCiphertext)
 		if err != nil {
 			return creds, httpx.ErrInternal(fmt.Errorf("секрет мерчанта нечитаем: %w", err))
 		}
@@ -384,15 +472,19 @@ func (s *PaymentService) credsFor(set *repository.StorePaymentSettings) (payment
 	return creds, nil
 }
 
-func (s *PaymentService) platformPayEnabled() bool {
-	p := s.cfg.Platform
-	if p.Provider == "" {
+// platformAvailable — можно ли принять подписку этим провайдером платформы. Kaspi
+// (ручной) для подписки не используется — нет автоактивации.
+func platformAvailable(provider string, pp PlatformPay) bool {
+	switch provider {
+	case "dev":
+		return true
+	case "freedompay":
+		return pp.MerchantID != "" && pp.Secret != "" && pp.WebhookToken != ""
+	case "halyk":
+		return pp.MerchantID != "" && pp.Secret != "" && pp.Terminal != "" && pp.WebhookToken != ""
+	default:
 		return false
 	}
-	if p.Provider == "dev" {
-		return true
-	}
-	return p.MerchantID != "" && p.Secret != "" && p.WebhookToken != ""
 }
 
 // mustGetPaymentID возвращает id платежа по ref (для установки provider_ref сразу

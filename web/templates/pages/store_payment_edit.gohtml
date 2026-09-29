@@ -1,0 +1,67 @@
+{{/* Кабинет: подключение/редактирование одного метода оплаты магазина. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container container--form">
+        <header class="page-head page-head--center">
+            <span class="logo__mark logo__mark--lg">{{ template "icon" "wallet" }}</span>
+            <h1 class="page-head__title">{{ .ProviderLabel }}</h1>
+            <p class="page-head__lead">{{ .L.T "pay.lead" }}</p>
+        </header>
+
+        {{ with .Form.Alert }}{{ template "alert" dict "Kind" "danger" "Text" . }}{{ end }}
+
+        <form class="form-card" method="post" action="{{ .Action }}" novalidate>
+            <div class="field field--check">
+                <label class="check"><input type="checkbox" name="enabled" value="1"{{ if .Method.IsEnabled }} checked{{ end }}> <span>{{ .L.T "pay.enabled" }}</span></label>
+            </div>
+
+            {{ if .Method.NeedsCreds }}
+            <div class="field">
+                <label class="field__label" for="merchant_id">{{ .L.T "pay.merchant_id" }}</label>
+                <input class="input" id="merchant_id" name="merchant_id" type="text" maxlength="200" value="{{ .Method.MerchantID }}">
+            </div>
+            {{ if .Method.NeedsTerminal }}
+            <div class="field">
+                <label class="field__label" for="terminal_id">{{ .L.T "pay.terminal" }}</label>
+                <input class="input" id="terminal_id" name="terminal_id" type="text" maxlength="200" value="{{ .Method.Terminal }}">
+            </div>
+            {{ end }}
+            <div class="field">
+                <label class="field__label" for="secret">{{ .L.T "pay.secret" }} <span class="field__optional">({{ .L.T "form.optional" }})</span></label>
+                <input class="input" id="secret" name="secret" type="password" autocomplete="new-password" maxlength="400"
+                    placeholder="{{ if .Method.HasSecret }}{{ .L.T `pay.secret_set` }}{{ else }}{{ .L.T `pay.secret_ph` }}{{ end }}">
+                <p class="field__hint">{{ .L.T "pay.secret_hint" }}</p>
+            </div>
+            <div class="field field--check">
+                <label class="check"><input type="checkbox" name="testing" value="1"{{ if .Method.Testing }} checked{{ end }}> <span>{{ .L.T "pay.testing" }}</span></label>
+            </div>
+            {{ else if eq .Method.Provider "kaspi" }}
+            <div class="field">
+                <label class="field__label" for="merchant_id">{{ .L.T "pay.kaspi_details" }}</label>
+                <input class="input" id="merchant_id" name="merchant_id" type="text" maxlength="200" value="{{ .Method.MerchantID }}">
+                <p class="field__hint">{{ .L.T "pay.kaspi_details_hint" }}</p>
+            </div>
+            {{ else }}
+            <p class="field__hint">{{ .L.T "pay.dev_hint" }}</p>
+            {{ end }}
+
+            <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "pay.save" }}</button>
+            <p class="form-card__footer"><a href="{{ .ListURL }}">{{ .L.T "pay.back" }}</a></p>
+        </form>
+
+        {{ with .WebhookURL }}
+        <div class="form-card">
+            <h2 class="form-card__title">{{ $.L.T "pay.webhook_title" }}</h2>
+            <p class="field__hint">{{ $.L.T "pay.webhook_hint" }}</p>
+            <code class="code-block">{{ . }}</code>
+        </div>
+        {{ end }}
+
+        {{ if .Method.Configured }}
+        <form class="form-card form-card--danger" method="post" action="{{ .DeleteAction }}">
+            <button class="btn btn--ghost btn--block" type="submit">{{ .L.T "pay.delete" }}</button>
+        </form>
+        {{ end }}
+    </div>
+</section>
+{{ end }}

@@ -141,10 +141,10 @@ func scanPayment(row *sql.Row) (*PaymentRow, error) {
 	return &p, nil
 }
 
-// --- Настройки оплаты магазина ---
+// --- Методы оплаты магазина (несколько провайдеров одновременно) ---
 
-// StorePaymentSettings — настройки приёма оплат магазином.
-type StorePaymentSettings struct {
+// StorePaymentMethod — один подключённый метод оплаты магазина.
+type StorePaymentMethod struct {
 	StoreID          int64
 	AccountID        int64
 	Provider         string
@@ -154,63 +154,84 @@ type StorePaymentSettings struct {
 	SecretCiphertext []byte
 	Testing          bool
 	WebhookToken     string
+	Sort             int
 	HasSecret        bool
 }
 
-// GetStorePaymentSettings возвращает настройки оплаты магазина (или nil, если ещё
-// не заданы). Изоляция по account_id.
-func (r *PaymentRepository) GetStorePaymentSettings(ctx context.Context, accountID, storeID int64) (*StorePaymentSettings, error) {
-	ctx, cancel := r.db.Context(ctx)
-	defer cancel()
-	const q = `
-		SELECT store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''), ISNULL(terminal_id, ''),
-		       secret_ciphertext, testing_mode, ISNULL(webhook_token, '')
-		FROM dbo.store_payment_settings WHERE store_id = @store AND account_id = @acc;`
+const storeMethodCols = `store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''), ISNULL(terminal_id, ''),
+	secret_ciphertext, testing_mode, ISNULL(webhook_token, ''), sort`
+
+func scanStoreMethod(sc interface{ Scan(...any) error }) (*StorePaymentMethod, error) {
 	var (
-		s      StorePaymentSettings
+		m      StorePaymentMethod
 		secret []byte
 	)
-	err := r.db.QueryRowContext(ctx, q, sql.Named("store", storeID), sql.Named("acc", accountID)).
-		Scan(&s.StoreID, &s.AccountID, &s.Provider, &s.IsEnabled, &s.MerchantID, &s.Terminal, &secret, &s.Testing, &s.WebhookToken)
+	if err := sc.Scan(&m.StoreID, &m.AccountID, &m.Provider, &m.IsEnabled, &m.MerchantID, &m.Terminal,
+		&secret, &m.Testing, &m.WebhookToken, &m.Sort); err != nil {
+		return nil, err
+	}
+	m.SecretCiphertext = secret
+	m.HasSecret = len(secret) > 0
+	return &m, nil
+}
+
+// ListStorePaymentMethods возвращает все методы оплаты магазина. Изоляция по account_id.
+func (r *PaymentRepository) ListStorePaymentMethods(ctx context.Context, accountID, storeID int64) ([]StorePaymentMethod, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	q := `SELECT ` + storeMethodCols + `
+		FROM dbo.store_payment_methods WHERE store_id = @store AND account_id = @acc ORDER BY sort, provider;`
+	rows, err := r.db.QueryContext(ctx, q, sql.Named("store", storeID), sql.Named("acc", accountID))
+	if err != nil {
+		return nil, fmt.Errorf("repository: методы оплаты магазина %d: %w", storeID, database.MapError(err))
+	}
+	defer rows.Close()
+	var out []StorePaymentMethod
+	for rows.Next() {
+		m, err := scanStoreMethod(rows)
+		if err != nil {
+			return nil, fmt.Errorf("repository: чтение метода оплаты: %w", err)
+		}
+		out = append(out, *m)
+	}
+	return out, rows.Err()
+}
+
+// GetStorePaymentMethod возвращает метод оплаты магазина по провайдеру (или nil).
+func (r *PaymentRepository) GetStorePaymentMethod(ctx context.Context, accountID, storeID int64, provider string) (*StorePaymentMethod, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	q := `SELECT ` + storeMethodCols + `
+		FROM dbo.store_payment_methods WHERE store_id = @store AND account_id = @acc AND provider = @provider;`
+	m, err := scanStoreMethod(r.db.QueryRowContext(ctx, q, sql.Named("store", storeID), sql.Named("acc", accountID), sql.Named("provider", provider)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("repository: настройки оплаты магазина %d: %w", storeID, database.MapError(err))
+		return nil, fmt.Errorf("repository: метод оплаты %s магазина %d: %w", provider, storeID, database.MapError(err))
 	}
-	s.SecretCiphertext = secret
-	s.HasSecret = len(secret) > 0
-	return &s, nil
+	return m, nil
 }
 
-// ResolveStorePaymentByToken находит настройки оплаты по провайдеру и токену
-// вебхука (для обработки входящего вебхука). Нет совпадения — database.ErrNotFound.
-func (r *PaymentRepository) ResolveStorePaymentByToken(ctx context.Context, provider, token string) (*StorePaymentSettings, error) {
+// ResolveStoreMethodByToken находит метод оплаты по провайдеру и токену вебхука.
+// Нет совпадения — database.ErrNotFound.
+func (r *PaymentRepository) ResolveStoreMethodByToken(ctx context.Context, provider, token string) (*StorePaymentMethod, error) {
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
-	const q = `
-		SELECT store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''), ISNULL(terminal_id, ''),
-		       secret_ciphertext, testing_mode, ISNULL(webhook_token, '')
-		FROM dbo.store_payment_settings WHERE provider = @provider AND webhook_token = @token;`
-	var (
-		s      StorePaymentSettings
-		secret []byte
-	)
-	err := r.db.QueryRowContext(ctx, q, sql.Named("provider", provider), sql.Named("token", token)).
-		Scan(&s.StoreID, &s.AccountID, &s.Provider, &s.IsEnabled, &s.MerchantID, &s.Terminal, &secret, &s.Testing, &s.WebhookToken)
+	q := `SELECT ` + storeMethodCols + `
+		FROM dbo.store_payment_methods WHERE provider = @provider AND webhook_token = @token;`
+	m, err := scanStoreMethod(r.db.QueryRowContext(ctx, q, sql.Named("provider", provider), sql.Named("token", token)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, database.ErrNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("repository: настройки оплаты по токену: %w", database.MapError(err))
+		return nil, fmt.Errorf("repository: метод оплаты по токену: %w", database.MapError(err))
 	}
-	s.SecretCiphertext = secret
-	s.HasSecret = len(secret) > 0
-	return &s, nil
+	return m, nil
 }
 
-// SaveStorePaymentSettingsInput — сохранение настроек оплаты магазина.
-type SaveStorePaymentSettingsInput struct {
+// SaveStorePaymentMethodInput — создание/обновление метода оплаты (по store+provider).
+type SaveStorePaymentMethodInput struct {
 	StoreID          int64
 	AccountID        int64
 	Provider         string
@@ -224,23 +245,21 @@ type SaveStorePaymentSettingsInput struct {
 	UpdateToken      bool
 }
 
-// SaveStorePaymentSettings создаёт или обновляет настройки (MERGE по store_id).
-// Секрет и токен меняются только если запрошено (чтобы не затирать при правке
-// прочих полей).
-func (r *PaymentRepository) SaveStorePaymentSettings(ctx context.Context, in SaveStorePaymentSettingsInput) error {
+// SaveStorePaymentMethod создаёт или обновляет метод (MERGE по store_id+provider).
+func (r *PaymentRepository) SaveStorePaymentMethod(ctx context.Context, in SaveStorePaymentMethodInput) error {
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
 	const q = `
-		MERGE dbo.store_payment_settings WITH (HOLDLOCK) AS t
-		USING (SELECT @store AS store_id) AS s
-		ON t.store_id = s.store_id
+		MERGE dbo.store_payment_methods WITH (HOLDLOCK) AS t
+		USING (SELECT @store AS store_id, @provider AS provider) AS s
+		ON t.store_id = s.store_id AND t.provider = s.provider
 		WHEN MATCHED THEN UPDATE SET
-			provider = @provider, is_enabled = @enabled, merchant_id = @merchant, terminal_id = @terminal, testing_mode = @testing,
-			secret_ciphertext = CASE WHEN @update_secret = 1 THEN @secret ELSE t.secret_ciphertext END,
+			is_enabled = @enabled, merchant_id = @merchant, terminal_id = @terminal, testing_mode = @testing,
+			secret_ciphertext = CASE WHEN @update_secret = 1 THEN CONVERT(VARBINARY(4000), @secret) ELSE t.secret_ciphertext END,
 			webhook_token = CASE WHEN @update_token = 1 THEN @token ELSE t.webhook_token END,
 			updated_at = SYSUTCDATETIME()
 		WHEN NOT MATCHED THEN INSERT (store_id, account_id, provider, is_enabled, merchant_id, terminal_id, testing_mode, secret_ciphertext, webhook_token)
-			VALUES (@store, @acc, @provider, @enabled, @merchant, @terminal, @testing, @secret, @token);`
+			VALUES (@store, @acc, @provider, @enabled, @merchant, @terminal, @testing, CONVERT(VARBINARY(4000), @secret), @token);`
 	_, err := r.db.ExecContext(ctx, q,
 		sql.Named("store", in.StoreID), sql.Named("acc", in.AccountID),
 		sql.Named("provider", in.Provider), sql.Named("enabled", boolBit(in.IsEnabled)),
@@ -250,7 +269,20 @@ func (r *PaymentRepository) SaveStorePaymentSettings(ctx context.Context, in Sav
 		sql.Named("update_token", boolBit(in.UpdateToken)), sql.Named("token", nullString(in.WebhookToken)),
 	)
 	if err != nil {
-		return fmt.Errorf("repository: сохранение настроек оплаты магазина %d: %w", in.StoreID, database.MapError(err))
+		return fmt.Errorf("repository: сохранение метода оплаты %s магазина %d: %w", in.Provider, in.StoreID, database.MapError(err))
+	}
+	return nil
+}
+
+// DeleteStorePaymentMethod удаляет метод оплаты магазина.
+func (r *PaymentRepository) DeleteStorePaymentMethod(ctx context.Context, accountID, storeID int64, provider string) error {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM dbo.store_payment_methods WHERE store_id = @store AND account_id = @acc AND provider = @provider;`,
+		sql.Named("store", storeID), sql.Named("acc", accountID), sql.Named("provider", provider))
+	if err != nil {
+		return fmt.Errorf("repository: удаление метода оплаты %s: %w", provider, database.MapError(err))
 	}
 	return nil
 }

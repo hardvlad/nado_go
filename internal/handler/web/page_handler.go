@@ -121,10 +121,12 @@ func (h *PageHandler) Routes() chi.Router {
 		r.Post("/stores/{id}/categories/{cid}/delete", h.wrap(h.CategoryDelete))
 	}
 
-	// Оплаты: настройки приёма оплат магазином и подписка платформе.
+	// Оплаты: несколько методов приёма оплат магазином и подписка платформе.
 	if h.Payments != nil {
-		r.Get("/stores/{id}/payments", h.wrap(h.StorePaymentsForm))
-		r.Post("/stores/{id}/payments", h.wrap(h.StorePaymentsSubmit))
+		r.Get("/stores/{id}/payments", h.wrap(h.StorePaymentsList))
+		r.Get("/stores/{id}/payments/{provider}", h.wrap(h.StorePaymentMethodForm))
+		r.Post("/stores/{id}/payments/{provider}", h.wrap(h.StorePaymentMethodSubmit))
+		r.Post("/stores/{id}/payments/{provider}/delete", h.wrap(h.StorePaymentMethodDelete))
 		r.Get("/billing", h.wrap(h.Billing))
 		r.Post("/billing/subscribe", h.wrap(h.BillingSubscribe))
 		r.Post("/billing/confirm", h.wrap(h.BillingConfirmDev))

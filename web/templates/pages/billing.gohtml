@@ -36,6 +36,14 @@
                 {{ if $.PayEnabled }}
                 <form method="post" action="{{ $.SubscribeAction }}">
                     <input type="hidden" name="plan" value="{{ .Code }}">
+                    {{ if gt (len $.Methods) 1 }}
+                    <div class="field">
+                        <label class="field__label" for="provider-{{ .Code }}">{{ $.L.T "billing.method" }}</label>
+                        <select class="input" id="provider-{{ .Code }}" name="provider">
+                            {{ range $.Methods }}<option value="{{ .Value }}">{{ .Label }}</option>{{ end }}
+                        </select>
+                    </div>
+                    {{ else }}<input type="hidden" name="provider" value="{{ (index $.Methods 0).Value }}">{{ end }}
                     <button class="btn btn--primary btn--block" type="submit">{{ $.L.T "billing.subscribe" }}</button>
                 </form>
                 {{ end }}

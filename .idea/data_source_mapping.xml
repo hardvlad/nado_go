@@ -17,5 +17,6 @@
     <file url="file://$PROJECT_DIR$/migrations/0014_store_cabinet_creds.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
     <file url="file://$PROJECT_DIR$/migrations/0015_product_overrides.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
     <file url="file://$PROJECT_DIR$/migrations/0016_payments.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
+    <file url="file://$PROJECT_DIR$/migrations/0017_payment_methods.sql" value="a1f6ef34-2603-4278-9464-7c53ecb901c2" />
   </component>
 </project>

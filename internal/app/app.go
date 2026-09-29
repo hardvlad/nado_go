@@ -220,17 +220,16 @@ func New(ctx context.Context, version string) (*App, error) {
 	// Слой онлайн-оплат: заказы витрины (мерчант продавца, D-01) и подписка
 	// платформе (мерчант nado). Провайдеры за интерфейсом payment.Provider.
 	paymentRegistry := payment.NewRegistry(payment.NewDev(), payment.NewFreedomPay(), payment.NewHalyk(), payment.NewKaspi())
+	platformPay := make(map[string]service.PlatformPay, len(cfg.Payments.Platform))
+	for _, m := range cfg.Payments.Platform {
+		platformPay[m.Provider] = service.PlatformPay{
+			Provider: m.Provider, MerchantID: m.MerchantID, Secret: m.Secret,
+			Terminal: m.Terminal, Testing: m.Testing, WebhookToken: m.WebhookToken,
+		}
+	}
 	paymentService := service.NewPaymentService(
 		repository.NewPaymentRepository(db), orderRepo, box, paymentRegistry, plans,
-		service.PaymentConfig{
-			DefaultProvider:  cfg.Payments.DefaultProvider,
-			SubscriptionDays: cfg.Payments.SubscriptionDays,
-			Platform: service.PlatformPay{
-				Provider: cfg.Payments.PlatformProvider, MerchantID: cfg.Payments.PlatformMerchantID,
-				Secret: cfg.Payments.PlatformSecret, Terminal: cfg.Payments.PlatformTerminal,
-				Testing: cfg.Payments.PlatformTesting, WebhookToken: cfg.Payments.PlatformWebhookToken,
-			},
-		}, log)
+		service.PaymentConfig{SubscriptionDays: cfg.Payments.SubscriptionDays, Platform: platformPay}, log)
 
 	// Редактирование каталога из кабинета (категории и товары, D-14/D-23).
 	catalogEdit := service.NewCatalogEditService(

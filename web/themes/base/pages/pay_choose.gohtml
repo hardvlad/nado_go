@@ -1,0 +1,19 @@
+{{ define "content" }}
+{{ $o := .Order }}
+<div class="panel panel--narrow">
+  <div class="order-head">
+    <h1>{{ .L.T "shop.pay_choose_title" }}</h1>
+    <span class="status-pill status-pill--pending">{{ .L.T "shop.status_awaiting_payment" }}</span>
+  </div>
+  <div class="summary-line summary-line--total">
+    <span>{{ .L.T "shop.order_number" }} {{ $o.Number }}</span>
+    <span>{{ money $o.TotalMinor $o.Currency .Lang }}</span>
+  </div>
+  <p class="pay-note mt-12">{{ .L.T "shop.pay_choose_lead" }}</p>
+  <div class="pay-methods">
+    {{ range .Methods }}
+    <a class="btn btn--outline btn--lg btn--block" href="{{ .URL }}">{{ $.L.T (printf "pay.provider_%s" .Provider) }}</a>
+    {{ end }}
+  </div>
+</div>
+{{ end }}

@@ -787,3 +787,24 @@ nado-go-conventions (`references/jobs-queue.md`).
   роутинг D-40). `ParseCallback` разбирает JSON тела; успех по code/status.
   ВАЖНО (fast-follow): для прода добавить перепроверку статуса через ePay
   check-status API — сейчас доверяем телу postLink + токену в пути.
+
+## D-43. Несколько методов оплаты одновременно + выбор способа
+**Дата:** 2026-09-29 · **Источник:** уточнение — провайдеры работают одновременно, покупатель/продавец выбирает способ
+
+- **Магазин: много методов.** Вместо одной строки настроек — таблица
+  `store_payment_methods` (миграция 0016 переписана, до деплоя): по строке на
+  провайдера, `UNIQUE(store_id, provider)`, каждый со своими реквизитами, вкл/выкл
+  и `webhook_token`. Раздел кабинета `/stores/{id}/payments` — список методов
+  (подключить/изменить/удалить, вкл/выкл каждый); форма метода
+  `/stores/{id}/payments/{provider}`. Repo: List/Get/Save/Delete/ResolveByToken.
+- **Витрина: выбор способа.** `PaymentService.EnabledStoreMethods`; если включён
+  один метод — оплата идёт сразу, если несколько — страница выбора `pay_choose`
+  (`/pay/{number}?t=..&provider=X`). `StartOrderPayment` принимает `provider`.
+- **Платформа: несколько мерчантов подписки.** `PaymentConfig.Platform`
+  `map[provider]PlatformPay` из `PLATFORM_PAY_PROVIDERS` + `PLATFORM_<CODE>_*`.
+  `PlatformMethods()` отдаёт доступные; `/billing` показывает выбор провайдера в
+  форме тарифа; `StartSubscriptionPayment(provider)`. Kaspi для подписки исключён
+  (ручной, нет автоактивации).
+- **Вебхук** `/webhooks/payment/{provider}/{token}` без изменений: сперва матчим
+  токен платформенного мерчанта этого провайдера (подписка), иначе — метод
+  магазина по (provider, token). Отменяет одиночную модель из D-40.

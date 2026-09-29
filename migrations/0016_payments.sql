@@ -9,29 +9,33 @@
    мерчант nado). Одна таблица payments с полем purpose. Секрет мерчанта хранится
    зашифрованным (AES-256-GCM), как токены провайдеров (nado-go-conventions). */
 
-/* Настройки приёма оплат магазином (свой мерчант-аккаунт продавца). */
-IF OBJECT_ID(N'dbo.store_payment_settings', N'U') IS NULL
+/* Методы приёма оплат магазином. У магазина может быть несколько активных
+   методов (по одному на провайдера); покупатель выбирает способ при оплате.
+   Свой мерчант-аккаунт продавца на каждый метод (D-01, D-43). */
+IF OBJECT_ID(N'dbo.store_payment_methods', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.store_payment_settings
+    CREATE TABLE dbo.store_payment_methods
     (
+        id                 BIGINT IDENTITY (1, 1) NOT NULL,
         store_id           BIGINT        NOT NULL,
         account_id         BIGINT        NOT NULL,
-        provider           VARCHAR(20)   NOT NULL CONSTRAINT DF_store_payment_settings_provider DEFAULT ('dev'),
-        is_enabled         BIT           NOT NULL CONSTRAINT DF_store_payment_settings_enabled DEFAULT (0),
+        provider           VARCHAR(20)   NOT NULL,
+        is_enabled         BIT           NOT NULL CONSTRAINT DF_store_payment_methods_enabled DEFAULT (0),
         merchant_id        NVARCHAR(200) NULL,          -- ID мерчанта (Halyk: ClientID)
         terminal_id        NVARCHAR(200) NULL,          -- терминал (Halyk ePay: TerminalID)
         secret_ciphertext  VARBINARY(4000) NULL,       -- секретный ключ мерчанта, зашифрован
-        testing_mode       BIT           NOT NULL CONSTRAINT DF_store_payment_settings_testing DEFAULT (0),
+        testing_mode       BIT           NOT NULL CONSTRAINT DF_store_payment_methods_testing DEFAULT (0),
         webhook_token      VARCHAR(64)   NULL,          -- секрет в пути вебхука /webhooks/payment/{provider}/{token}
-        public_meta        NVARCHAR(MAX) NULL CONSTRAINT CK_store_payment_settings_meta_json CHECK (public_meta IS NULL OR ISJSON(public_meta) = 1),
-        created_at         DATETIME2(3)  NOT NULL CONSTRAINT DF_store_payment_settings_created DEFAULT (SYSUTCDATETIME()),
-        updated_at         DATETIME2(3)  NOT NULL CONSTRAINT DF_store_payment_settings_updated DEFAULT (SYSUTCDATETIME()),
-        CONSTRAINT PK_store_payment_settings PRIMARY KEY CLUSTERED (store_id),
-        CONSTRAINT FK_store_payment_settings_stores FOREIGN KEY (store_id) REFERENCES dbo.stores (id),
-        CONSTRAINT FK_store_payment_settings_accounts FOREIGN KEY (account_id) REFERENCES dbo.accounts (id),
-        CONSTRAINT CK_store_payment_settings_provider CHECK (provider IN ('dev', 'freedompay', 'kaspi', 'halyk'))
+        sort               INT           NOT NULL CONSTRAINT DF_store_payment_methods_sort DEFAULT (0),
+        created_at         DATETIME2(3)  NOT NULL CONSTRAINT DF_store_payment_methods_created DEFAULT (SYSUTCDATETIME()),
+        updated_at         DATETIME2(3)  NOT NULL CONSTRAINT DF_store_payment_methods_updated DEFAULT (SYSUTCDATETIME()),
+        CONSTRAINT PK_store_payment_methods PRIMARY KEY CLUSTERED (id),
+        CONSTRAINT FK_store_payment_methods_stores FOREIGN KEY (store_id) REFERENCES dbo.stores (id),
+        CONSTRAINT FK_store_payment_methods_accounts FOREIGN KEY (account_id) REFERENCES dbo.accounts (id),
+        CONSTRAINT UX_store_payment_methods_store_provider UNIQUE (store_id, provider),
+        CONSTRAINT CK_store_payment_methods_provider CHECK (provider IN ('dev', 'freedompay', 'kaspi', 'halyk'))
     );
-    CREATE INDEX IX_store_payment_settings_token ON dbo.store_payment_settings (provider, webhook_token);
+    CREATE INDEX IX_store_payment_methods_token ON dbo.store_payment_methods (provider, webhook_token);
 END;
 GO
 

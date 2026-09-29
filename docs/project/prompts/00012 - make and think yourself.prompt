@@ -5,3 +5,13 @@
 Если возникнут вопросы - постарайся сам дать на них логичный ответ.
 
 Добавь также Halyk Pay - пример реализации находится в docs/project/kaspi_samples/EPay.php - он должен выбираться как способ оплаты при оплате на нашей платформе и на сате магазина продавца
+
+Ты немного не понял - все платежные провайдеры работают одновременно на платформе, клиент при оплате может выбрать через какого провайдера платить.
+В магазине продавца - он тоже может подключить несколько способов оплаты у себя на сайте (нужен раздел в кабинете для управления подключенными методами платежа) - и если активны несколько методов - необходимо отображать выбор метода платежа
+
+Исправь ошибку при входе на страницу оплат аккаунта продавца -
+ level=ERROR msg="ошибка страницы" service=nado request_id=my.profitbot.kz/UFw0brJJr6-000065 method=GET path=/stores/2/payments error="Внутренняя ошибка сервера: repository: методы оплаты магазина 2: mssql: Invalid object name 'dbo.store_payment_methods'. (208)"
+time=2026-09-29T18:30:22.857+05:00 level=ERROR msg="запрос завершён с ошибкой" service=nado request_id=my.profitbot.kz/UFw0brJJr6-000065 method=GET path=/stores/2/payments status=500
+
+Исправь ошибку при сохранении способа оплаты (сохранял тестовый способ) -
+level=ERROR msg="ошибка страницы" service=nado request_id=my.profitbot.kz/jsv2puuWPS-000028 method=POST path=/stores/2/payments/dev error="Внутренняя ошибка сервера: repository: сохранение метода оплаты dev магазина 2: mssql: Implicit conversion from data type nvarchar to varbinary is not allowed. Use the CONVERT function to run this query. (257)"

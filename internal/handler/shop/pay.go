@@ -10,6 +10,19 @@ import (
 	"nado_go/internal/service"
 )
 
+// methodAllowed проверяет, что провайдер есть среди включённых методов магазина.
+func methodAllowed(methods []service.PaymentMethodView, provider string) bool {
+	if provider == "" {
+		return false
+	}
+	for _, m := range methods {
+		if m.Provider == provider {
+			return true
+		}
+	}
+	return false
+}
+
 // halykCSP — CSP страницы виджета Halyk: домены ePay в script-src/frame-src.
 func halykCSP() string {
 	hosts := strings.Join(payment.HalykScriptHosts, " ")
@@ -47,17 +60,46 @@ func (h *Handler) payStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prefix := PrefixFrom(r.Context())
-	orderPath := prefix + "/order/" + strconv.FormatInt(number, 10) + "?t=" + token
+	numStr := strconv.FormatInt(number, 10)
+	orderPath := prefix + "/order/" + numStr + "?t=" + token
 	if order.Status == "paid" {
-		h.redirect(w, r, "/order/"+strconv.FormatInt(number, 10)+"?t="+token)
+		h.redirect(w, r, "/order/"+numStr+"?t="+token)
+		return
+	}
+
+	// Доступные способы оплаты магазина. Если несколько — покупатель выбирает.
+	methods, err := h.Payments.EnabledStoreMethods(r.Context(), store.AccountID, store.ID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	if len(methods) == 0 {
+		h.redirect(w, r, "/order/"+numStr+"?t="+token)
+		return
+	}
+	provider := r.URL.Query().Get("provider")
+	if provider == "" && len(methods) == 1 {
+		provider = methods[0].Provider
+	}
+	if !methodAllowed(methods, provider) {
+		// Показываем выбор способа оплаты.
+		type opt struct{ Provider, URL string }
+		opts := make([]opt, 0, len(methods))
+		for _, m := range methods {
+			opts = append(opts, opt{Provider: m.Provider, URL: prefix + "/pay/" + numStr + "?t=" + token + "&provider=" + m.Provider})
+		}
+		data := h.baseData(r, "shop.pay_title")
+		data["Order"] = order
+		data["Methods"] = opts
+		h.render(w, r, http.StatusOK, "pay_choose", data)
 		return
 	}
 
 	success := h.origin(r) + orderPath
-	res, err := h.Payments.StartOrderPayment(r.Context(), store.AccountID, store.ID, order, h.origin(r), success, success)
+	res, err := h.Payments.StartOrderPayment(r.Context(), store.AccountID, store.ID, order, provider, h.origin(r), success, success)
 	if errors.Is(err, service.ErrPaymentsDisabled) {
-		// Оплата не настроена — возвращаем на страницу заказа (там подскажем связаться).
-		h.redirect(w, r, "/order/"+strconv.FormatInt(number, 10)+"?t="+token)
+		// Метод не настроен — возвращаем на страницу заказа.
+		h.redirect(w, r, "/order/"+numStr+"?t="+token)
 		return
 	}
 	if err != nil {
