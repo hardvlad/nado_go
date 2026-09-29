@@ -378,6 +378,15 @@ h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2rem); letter-spacing: -.01em; }
 .qty-form { display: flex; align-items: center; gap: 8px; }
 .qty-form .qty-input { width: 72px; min-height: 40px; text-align: center; }
 
+/* Таблица заказов в кабинете покупателя */
+.table-scroll { overflow-x: auto; margin-top: 12px; }
+.orders-table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.orders-table th, .orders-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: middle; white-space: nowrap; }
+.orders-table thead th { color: var(--color-text-muted); font-weight: 600; font-size: .85rem; }
+.orders-table tbody tr:last-child td { border-bottom: none; }
+.ta-right { text-align: right; }
+.hr-soft { border: none; border-top: 1px solid var(--color-border); }
+
 /* Шапка: корзина со значком и суммой под ним */
 .cart-link { position: static; display: inline-flex; flex-direction: column; align-items: center; gap: 2px; color: var(--color-text); }
 .cart-link:hover { text-decoration: none; }

@@ -54,17 +54,23 @@ func (p *Halyk) Start(ctx context.Context, in StartInput) (*StartResult, error) 
 	amount := strconv.FormatInt(in.AmountMinor/100, 10) // ePay: сумма в тенге (целое)
 	secretHash := randHex(20)
 
+	// ePay зовёт postLink при успехе и failurePostLink при отказе и сохраняет наши
+	// query-параметры. Кладём в них наш invoiceId (для поиска платежа, т.к. тело
+	// GET-callback пустое) и признак result — по нему определяем исход.
+	successCb := withParams(in.CallbackURL, "invoiceId", in.Ref, "result", "success")
+	failureCb := withParams(in.CallbackURL, "invoiceId", in.Ref, "result", "fail")
+
 	form := url.Values{
 		"grant_type":      {"client_credentials"},
-		"scope":           {"payment"},
+		"scope":           {"payment usermanagement"},
 		"client_id":       {in.Creds.MerchantID},
 		"client_secret":   {in.Creds.Secret},
 		"invoiceID":       {in.Ref},
 		"amount":          {amount},
 		"currency":        {defaultCurrency(in.Currency)},
 		"terminal":        {in.Creds.Terminal},
-		"postLink":        {in.CallbackURL},
-		"failurePostLink": {in.CallbackURL},
+		"postLink":        {successCb},
+		"failurePostLink": {failureCb},
 		"secret_hash":     {secretHash},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, oauthURL, strings.NewReader(form.Encode()))
@@ -81,11 +87,11 @@ func (p *Halyk) Start(ctx context.Context, in StartInput) (*StartResult, error) 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 
 	var token map[string]any
-	if err := json.Unmarshal(body, &token); err != nil {
-		return nil, fmt.Errorf("payment: halyk oauth: ответ не разобран: %w", err)
+	if jsonErr := json.Unmarshal(body, &token); jsonErr != nil {
+		return nil, fmt.Errorf("payment: halyk oauth (%d): ответ не разобран: %s", resp.StatusCode, snippet(body))
 	}
 	if _, ok := token["access_token"]; !ok || resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("payment: halyk oauth отклонён (%d)", resp.StatusCode)
+		return nil, fmt.Errorf("payment: halyk oauth отклонён (%d): %s", resp.StatusCode, snippet(body))
 	}
 
 	// Конфиг для halyk.pay(...) — как в референсе EPay.php.
@@ -93,8 +99,8 @@ func (p *Halyk) Start(ctx context.Context, in StartInput) (*StartResult, error) 
 		"invoiceId":       in.Ref,
 		"backLink":        in.SuccessURL,
 		"failureBackLink": in.FailURL,
-		"postLink":        in.CallbackURL,
-		"failurePostLink": in.CallbackURL,
+		"postLink":        successCb,
+		"failurePostLink": failureCb,
 		"language":        "RU",
 		"description":     in.Description,
 		"accountId":       "",
@@ -115,27 +121,53 @@ func (p *Halyk) Start(ctx context.Context, in StartInput) (*StartResult, error) 
 	}, nil
 }
 
-// ParseCallback разбирает postLink ePay (JSON тела). token в пути уже привязал
-// платёж к мерчанту; успех определяется по коду/статусу.
+// ParseCallback разбирает результат ePay. ePay шлёт его на postLink как GET с
+// параметрами в query, либо как POST (JSON или форма) — поддерживаем всё. token в
+// пути уже привязал платёж к мерчанту; успех определяется по коду/статусу.
 //
 // ВНИМАНИЕ: для прода стоит дополнительно перепроверять статус транзакции через
-// API ePay (check-status) — здесь минимальная проверка по телу postLink.
+// API ePay (check-status) — здесь проверка по телу/параметрам callback.
 func (p *Halyk) ParseCallback(r *http.Request, _ Credentials) (*Callback, error) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	if err != nil {
-		return nil, fmt.Errorf("payment: halyk callback: %w", err)
+	m := map[string]any{}
+	// Параметры из query (GET-callback ePay).
+	for k, v := range r.URL.Query() {
+		if len(v) > 0 {
+			m[k] = v[0]
+		}
 	}
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		return nil, fmt.Errorf("payment: halyk callback: тело не разобрано: %w", err)
+	// Тело (POST): JSON или form-urlencoded.
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if len(body) > 0 {
+		var jm map[string]any
+		if json.Unmarshal(body, &jm) == nil {
+			for k, v := range jm {
+				m[k] = v
+			}
+		} else if form, err := url.ParseQuery(string(body)); err == nil {
+			for k, v := range form {
+				if len(v) > 0 {
+					m[k] = v[0]
+				}
+			}
+		}
 	}
-	ref := firstString(m, "invoiceId", "invoiceID", "orderId")
+
+	ref := firstString(m, "invoiceId", "invoiceID", "orderId", "order_id", "orderid")
 	if ref == "" {
-		return nil, fmt.Errorf("payment: halyk callback: нет invoiceId")
+		return nil, fmt.Errorf("payment: halyk callback: нет invoiceId (%s)", snippet(body))
 	}
+	// Исход: сперва по нашему признаку result (ePay зовёт postLink=success /
+	// failurePostLink=fail), затем — по коду/статусу из тела, если он есть.
 	status := StatusFailed
-	if halykSuccess(m) {
+	switch firstString(m, "result") {
+	case "success":
 		status = StatusSucceeded
+	case "fail":
+		status = StatusFailed
+	default:
+		if halykSuccess(m) {
+			status = StatusSucceeded
+		}
 	}
 	return &Callback{
 		Ref:         ref,
@@ -189,6 +221,32 @@ func firstString(m map[string]any, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+// withParams добавляет query-параметры к URL (ePay сохраняет их при вызове
+// postLink/failurePostLink и возвращает нам обратно).
+func withParams(base string, kv ...string) string {
+	u, err := url.Parse(base)
+	if err != nil {
+		return base
+	}
+	q := u.Query()
+	for i := 0; i+1 < len(kv); i += 2 {
+		q.Set(kv[i], kv[i+1])
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// snippet — короткий фрагмент тела ответа для диагностики ошибки (без переводов
+// строк). Тело ошибки OAuth ePay содержит error/error_description, не секреты.
+func snippet(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) > 300 {
+		s = s[:300]
+	}
+	return s
 }
 
 func randHex(n int) string {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -234,10 +235,23 @@ func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, store
 		return nil, ErrPaymentProvider
 	}
 
+	// Читабельный номер для шлюза — номер заказа магазина + 2 цифры попытки
+	// (чтобы номер оставался уникальным при повторной оплате). Формат
+	// order.Number*100+attempt: всегда 6–15 цифр (требование Halyk ePay к длине
+	// invoiceID) и уникален на попытку, т.к. номер заказа магазина ≥ 1001.
+	attempt, err := s.payments.CountOrderPayments(ctx, order.ID)
+	if err != nil {
+		return nil, httpx.ErrInternal(err)
+	}
+	if attempt > 99 {
+		attempt = 99
+	}
+	gatewayRef := strconv.FormatInt(order.Number*100+int64(attempt), 10)
+
 	ref := "o-" + randToken(24)
 	if _, err := s.payments.CreatePayment(ctx, repository.NewPayment{
 		AccountID: accountID, StoreID: storeID, Purpose: "order", OrderID: order.ID,
-		Provider: provider, RefToken: ref, AmountMinor: order.TotalMinor, Currency: order.Currency,
+		Provider: provider, RefToken: ref, GatewayRef: gatewayRef, AmountMinor: order.TotalMinor, Currency: order.Currency,
 	}); err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
@@ -248,7 +262,7 @@ func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, store
 	}
 	callback := origin + "/webhooks/payment/" + provider + "/" + m.WebhookToken
 	res, err := prov.Start(ctx, payment.StartInput{
-		Ref: ref, AmountMinor: order.TotalMinor, Currency: order.Currency,
+		Ref: gatewayRef, AmountMinor: order.TotalMinor, Currency: order.Currency,
 		Description: fmt.Sprintf("Заказ №%d", order.Number),
 		Email:       order.CustomerEmail, Phone: order.CustomerPhone,
 		SuccessURL: successURL, FailURL: failURL, CallbackURL: callback, Creds: creds,
@@ -323,17 +337,22 @@ func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID
 	}
 
 	ref := "s-" + randToken(24)
-	if _, err := s.payments.CreatePayment(ctx, repository.NewPayment{
+	paymentID, err := s.payments.CreatePayment(ctx, repository.NewPayment{
 		AccountID: accountID, StoreID: storeID, Purpose: "subscription", Provider: provider,
 		RefToken: ref, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
 		PlanCode: planCode, PeriodDays: s.cfg.SubscriptionDays,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
+	// Читабельный номер для шлюза — id платежа со сдвигом на 1_000_000 (у подписки
+	// нет номера заказа): 7–15 цифр без ведущих нулей — в пределах правил Halyk.
+	gatewayRef := strconv.FormatInt(paymentID+1_000_000, 10)
+	_ = s.payments.SetGatewayRef(ctx, paymentID, gatewayRef)
 
 	callback := origin + "/webhooks/payment/" + provider + "/" + pp.WebhookToken
 	res, err := prov.Start(ctx, payment.StartInput{
-		Ref: ref, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
+		Ref: gatewayRef, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
 		Description: "Подписка nado: тариф " + planCode,
 		SuccessURL:  successURL, FailURL: failURL, CallbackURL: callback,
 		Creds: payment.Credentials{MerchantID: pp.MerchantID, Secret: pp.Secret, Terminal: pp.Terminal, Testing: pp.Testing},
@@ -390,8 +409,8 @@ func (s *PaymentService) HandleWebhook(ctx context.Context, provider, token stri
 			return ct, b, perr
 		}
 		if cb.Status == payment.StatusSucceeded {
-			p, gerr := s.payments.GetPaymentByRef(ctx, cb.Ref)
-			if gerr == nil && p.Purpose == "subscription" {
+			p, gerr := s.payments.GetSubscriptionPaymentByGatewayRef(ctx, cb.Ref)
+			if gerr == nil {
 				if err := s.settleSubscription(ctx, p); err != nil {
 					s.log.Error("вебхук подписки: активация не удалась", slog.Any("error", err))
 				}
@@ -418,13 +437,22 @@ func (s *PaymentService) HandleWebhook(ctx context.Context, provider, token stri
 		ct, b := prov.CallbackResponse(false)
 		return ct, b, perr
 	}
+	// Шлюз возвращает переданный читабельный номер (gateway_ref); находим платёж
+	// заказа в пределах магазина.
+	p, gerr := s.payments.GetOrderPaymentByGatewayRef(ctx, m.StoreID, cb.Ref)
+	if errors.Is(gerr, database.ErrNotFound) {
+		return "", nil, ErrPaymentNotFound
+	}
+	if gerr != nil {
+		return "", nil, httpx.ErrInternal(gerr)
+	}
 	switch cb.Status {
 	case payment.StatusSucceeded:
-		if err := s.settleOrder(ctx, cb.Ref, cb.ProviderRef); err != nil {
+		if err := s.settleOrder(ctx, p.RefToken, cb.ProviderRef); err != nil {
 			s.log.Error("вебхук оплаты: проводка не удалась", slog.Any("error", err))
 		}
 	case payment.StatusFailed, payment.StatusCanceled:
-		if _, err := s.payments.MarkPaymentStatus(ctx, cb.Ref, string(cb.Status), cb.ProviderRef); err != nil {
+		if _, err := s.payments.MarkPaymentStatus(ctx, p.RefToken, string(cb.Status), cb.ProviderRef); err != nil {
 			s.log.Warn("вебхук оплаты: смена статуса не удалась", slog.Any("error", err))
 		}
 	}

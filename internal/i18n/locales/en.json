@@ -585,6 +585,7 @@
   "shop.order_created": "Order placed",
   "shop.order_number": "Order number",
   "shop.order_status": "Status",
+  "shop.order_date": "Date",
   "shop.status_awaiting_payment": "Awaiting payment",
   "shop.status_new": "New",
   "shop.status_paid": "Paid",

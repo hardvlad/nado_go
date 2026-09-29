@@ -24,10 +24,12 @@ func NewPayment(proc PaymentProcessor, log *slog.Logger) *Payment {
 	return &Payment{proc: proc, log: log}
 }
 
-// Routes монтируется под /webhooks/payment.
+// Routes монтируется под /webhooks/payment. Провайдеры шлют результат по-разному:
+// Freedom Pay — POST-формой, Halyk ePay — GET на postLink, поэтому принимаем оба.
 func (h *Payment) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/{provider}/{token}", h.receive)
+	r.Get("/{provider}/{token}", h.receive)
 	return r
 }
 

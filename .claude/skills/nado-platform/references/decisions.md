@@ -823,3 +823,36 @@ nado-go-conventions (`references/jobs-queue.md`).
   aside). На карточке показывается «Подписка оплачена до …» либо остаток пробного
   периода. `model.Store` получил `SubscriptionStatus/Until/PlanCode` +
   `SubscriptionActive()`; `ListStores` их выбирает. Дополняет D-40/D-43.
+
+## D-45. Читабельный номер заказа в платёжном шлюзе
+**Дата:** 2026-09-29 · **Источник:** требование передавать в шлюз читабельный номер из цифр
+
+- В шлюз (pg_order_id / invoiceId) теперь уходит **читабельный номер**: для заказа —
+  номер заказа магазина (`orders.number`), на повторных попытках с суффиксом номера
+  попытки; для подписки — id платежа. Раньше уходил внутренний `ref_token` вида
+  `o-<hex>`.
+- Поскольку номера заказов повторяются между магазинами, а `payments.ref_token`
+  глобально уникален, добавлена колонка `payments.gateway_ref` (миграция 0019):
+  `ref_token` остаётся внутренним ключом/идемпотентностью и путём dev-подтверждения,
+  а `gateway_ref` — то, что видит шлюз и возвращает в вебхуке.
+- Вебхук ищет платёж по `gateway_ref`: заказ — по (`store_id` из токена метода,
+  `gateway_ref`, предпочитая pending), подписка — по `gateway_ref`. Провайдеры
+  (freedompay/halyk) отдают его как pg_order_id/invoiceId; Halyk-номер остаётся
+  чисто числовым.
+
+  - Уточнение (Halyk ePay): invoiceID должен быть 6–15 цифр (code 520 «Длина
+    invoiceID не соответствует правилам»). Поэтому gateway_ref: заказ —
+    `order.Number*100+attempt` (номер заказа ≥1001 → ≥6 цифр, уникален на попытку),
+    подписка — `paymentID+1_000_000` (7–15 цифр без ведущих нулей).
+
+  - Уточнение (Halyk ePay вебхук): ePay вызывает postLink методом **GET** (параметры
+    в query), а не только POST. Роут вебхука принимает GET и POST; `Halyk.ParseCallback`
+    читает и query (GET), и тело (POST JSON/форма). Иначе GET давал 405 и заказ
+    оставался «ожидает оплаты».
+
+  - Уточнение (Halyk ePay callback, по PaymentsController.php EpaySuccess): ePay НЕ
+    добавляет invoiceId в callback сам — он сохраняет query-параметры, которые мы
+    заложили в postLink/failurePostLink, и зовёт postLink при успехе,
+    failurePostLink при отказе. Поэтому в оба URL кладём `invoiceId=<gateway_ref>`
+    (для поиска платежа; тело GET-callback пустое) и `result=success|fail` (исход).
+    ParseCallback читает их из query.

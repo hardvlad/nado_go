@@ -585,6 +585,7 @@
   "shop.order_created": "Заказ оформлен",
   "shop.order_number": "Номер заказа",
   "shop.order_status": "Статус",
+  "shop.order_date": "Дата",
   "shop.status_awaiting_payment": "Ожидает оплаты",
   "shop.status_new": "Новый",
   "shop.status_paid": "Оплачен",

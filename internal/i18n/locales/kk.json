@@ -585,6 +585,7 @@
   "shop.order_created": "Тапсырыс рәсімделді",
   "shop.order_number": "Тапсырыс нөмірі",
   "shop.order_status": "Мәртебе",
+  "shop.order_date": "Күні",
   "shop.status_awaiting_payment": "Төлемді күтуде",
   "shop.status_new": "Жаңа",
   "shop.status_paid": "Төленді",

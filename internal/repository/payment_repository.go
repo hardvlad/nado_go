@@ -27,7 +27,8 @@ type NewPayment struct {
 	Purpose     string
 	OrderID     int64 // 0 — нет заказа
 	Provider    string
-	RefToken    string
+	RefToken    string // внутренний глобально-уникальный ключ
+	GatewayRef  string // читабельный номер, переданный шлюзу (номер заказа/id платежа)
 	AmountMinor int64
 	Currency    string
 	PlanCode    string
@@ -44,6 +45,7 @@ type PaymentRow struct {
 	Provider    string
 	ProviderRef string
 	RefToken    string
+	GatewayRef  string
 	AmountMinor int64
 	Currency    string
 	Status      string
@@ -51,20 +53,25 @@ type PaymentRow struct {
 	PeriodDays  int
 }
 
+// paymentCols — список колонок платежа в порядке scanPayment.
+const paymentCols = `id, account_id, ISNULL(store_id, 0), purpose, ISNULL(order_id, 0), provider,
+	ISNULL(provider_ref, ''), ref_token, ISNULL(gateway_ref, ''), amount_minor, currency, status,
+	ISNULL(plan_code, ''), ISNULL(period_days, 0)`
+
 // CreatePayment создаёт платёж в статусе pending и возвращает его id.
 func (r *PaymentRepository) CreatePayment(ctx context.Context, in NewPayment) (int64, error) {
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
 
 	const q = `
-		INSERT INTO dbo.payments (account_id, store_id, purpose, order_id, provider, ref_token, amount_minor, currency, status, plan_code, period_days)
+		INSERT INTO dbo.payments (account_id, store_id, purpose, order_id, provider, ref_token, gateway_ref, amount_minor, currency, status, plan_code, period_days)
 		OUTPUT INSERTED.id
-		VALUES (@acc, @store, @purpose, @order, @provider, @ref, @amount, @cur, 'pending', @plan, @period);`
+		VALUES (@acc, @store, @purpose, @order, @provider, @ref, @gw, @amount, @cur, 'pending', @plan, @period);`
 	var id int64
 	err := r.db.QueryRowContext(ctx, q,
 		sql.Named("acc", in.AccountID), sql.Named("store", nullInt64(in.StoreID)),
 		sql.Named("purpose", in.Purpose), sql.Named("order", nullInt64(in.OrderID)),
-		sql.Named("provider", in.Provider), sql.Named("ref", in.RefToken),
+		sql.Named("provider", in.Provider), sql.Named("ref", in.RefToken), sql.Named("gw", nullString(in.GatewayRef)),
 		sql.Named("amount", in.AmountMinor), sql.Named("cur", in.Currency),
 		sql.Named("plan", nullString(in.PlanCode)), sql.Named("period", nullInt(in.PeriodDays)),
 	).Scan(&id)
@@ -87,15 +94,75 @@ func (r *PaymentRepository) SetProviderRef(ctx context.Context, id int64, ref st
 	return nil
 }
 
+// SetGatewayRef сохраняет читабельный номер, переданный шлюзу.
+func (r *PaymentRepository) SetGatewayRef(ctx context.Context, id int64, gatewayRef string) error {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE dbo.payments SET gateway_ref = @gw, updated_at = SYSUTCDATETIME() WHERE id = @id;`,
+		sql.Named("gw", nullString(gatewayRef)), sql.Named("id", id))
+	if err != nil {
+		return fmt.Errorf("repository: сохранение gateway_ref: %w", database.MapError(err))
+	}
+	return nil
+}
+
+// CountOrderPayments возвращает число уже созданных платежей заказа (для номера
+// попытки в читабельном gateway_ref).
+func (r *PaymentRepository) CountOrderPayments(ctx context.Context, orderID int64) (int, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM dbo.payments WHERE order_id = @oid;`, sql.Named("oid", orderID)).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("repository: число платежей заказа %d: %w", orderID, database.MapError(err))
+	}
+	return n, nil
+}
+
+// GetOrderPaymentByGatewayRef ищет платёж заказа по (store_id, gateway_ref) —
+// для обработки вебхука (шлюз возвращает переданный номер). Предпочитает pending.
+func (r *PaymentRepository) GetOrderPaymentByGatewayRef(ctx context.Context, storeID int64, gatewayRef string) (*PaymentRow, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	q := `SELECT TOP 1 ` + paymentCols + `
+		FROM dbo.payments
+		WHERE store_id = @store AND purpose = 'order' AND gateway_ref = @gw
+		ORDER BY CASE WHEN status = 'pending' THEN 0 ELSE 1 END, id DESC;`
+	p, err := scanPayment(r.db.QueryRowContext(ctx, q, sql.Named("store", storeID), sql.Named("gw", gatewayRef)))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository: платёж заказа по номеру %s: %w", gatewayRef, database.MapError(err))
+	}
+	return p, nil
+}
+
+// GetSubscriptionPaymentByGatewayRef ищет платёж подписки по gateway_ref.
+func (r *PaymentRepository) GetSubscriptionPaymentByGatewayRef(ctx context.Context, gatewayRef string) (*PaymentRow, error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	q := `SELECT TOP 1 ` + paymentCols + `
+		FROM dbo.payments
+		WHERE purpose = 'subscription' AND gateway_ref = @gw
+		ORDER BY CASE WHEN status = 'pending' THEN 0 ELSE 1 END, id DESC;`
+	p, err := scanPayment(r.db.QueryRowContext(ctx, q, sql.Named("gw", gatewayRef)))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository: платёж подписки по номеру %s: %w", gatewayRef, database.MapError(err))
+	}
+	return p, nil
+}
+
 // GetPaymentByRef возвращает платёж по нашему ref_token.
 func (r *PaymentRepository) GetPaymentByRef(ctx context.Context, ref string) (*PaymentRow, error) {
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
-	const q = `
-		SELECT id, account_id, ISNULL(store_id, 0), purpose, ISNULL(order_id, 0), provider,
-		       ISNULL(provider_ref, ''), ref_token, amount_minor, currency, status,
-		       ISNULL(plan_code, ''), ISNULL(period_days, 0)
-		FROM dbo.payments WHERE ref_token = @ref;`
+	q := `SELECT ` + paymentCols + ` FROM dbo.payments WHERE ref_token = @ref;`
 	p, err := scanPayment(r.db.QueryRowContext(ctx, q, sql.Named("ref", ref)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, database.ErrNotFound
@@ -118,7 +185,7 @@ func (r *PaymentRepository) MarkPaymentStatus(ctx context.Context, ref, status, 
 		    updated_at = SYSUTCDATETIME()
 		OUTPUT INSERTED.id, INSERTED.account_id, ISNULL(INSERTED.store_id, 0), INSERTED.purpose,
 		       ISNULL(INSERTED.order_id, 0), INSERTED.provider, ISNULL(INSERTED.provider_ref, ''),
-		       INSERTED.ref_token, INSERTED.amount_minor, INSERTED.currency, INSERTED.status,
+		       INSERTED.ref_token, ISNULL(INSERTED.gateway_ref, ''), INSERTED.amount_minor, INSERTED.currency, INSERTED.status,
 		       ISNULL(INSERTED.plan_code, ''), ISNULL(INSERTED.period_days, 0)
 		WHERE ref_token = @ref;`
 	p, err := scanPayment(r.db.QueryRowContext(ctx, q,
@@ -135,7 +202,7 @@ func (r *PaymentRepository) MarkPaymentStatus(ctx context.Context, ref, status, 
 func scanPayment(row *sql.Row) (*PaymentRow, error) {
 	var p PaymentRow
 	if err := row.Scan(&p.ID, &p.AccountID, &p.StoreID, &p.Purpose, &p.OrderID, &p.Provider,
-		&p.ProviderRef, &p.RefToken, &p.AmountMinor, &p.Currency, &p.Status, &p.PlanCode, &p.PeriodDays); err != nil {
+		&p.ProviderRef, &p.RefToken, &p.GatewayRef, &p.AmountMinor, &p.Currency, &p.Status, &p.PlanCode, &p.PeriodDays); err != nil {
 		return nil, err
 	}
 	return &p, nil

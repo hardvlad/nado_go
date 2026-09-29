@@ -26,3 +26,21 @@ level=ERROR msg="ошибка страницы" service=nado request_id=my.profi
 
 В корзине - сделай, пожалуйста, так чтобы при уменьшении или увеличении количества - оно автоматически обновлялось на сервере с обновлением в браузере, без необходимости нажимать кнопку Обновить. Кнопку обновить можно убрать
 
+При оплате - передавай в платежный шлюз читабельный номер заказа из цифр
+
+Возникает ошибка при попытке оплатить -
+level=ERROR msg="ошибка страницы" service=nado request_id=my.profitbot.kz/mAFIThXNVT-000009 method=POST path=/stores/2/billing/subscribe error="Внутренняя ошибка сервера: payment: halyk oauth отклонён (400)"
+
+Ошибка теперь такая
+level=ERROR msg="ошибка страницы" service=nado request_id=my.profitbot.kz/J1pmsx4mE3-000027 method=POST path=/stores/2/billing/subscribe error="Внутренняя ошибка сервера: payment: halyk oauth отклонён (400): {\"code\":520,\"message\":\"Длина invoiceID не соответствует правилам\"}"
+
+После успешной оплаты на сайте продавца через Halyk ePay заказ остался в статусе "ожидает оплаты", а в логе появилась запись -
+ level=WARN msg="запрос отклонён" service=nado request_id=my.profitbot.kz/g8wEDSYOdJ-000282 method=GET path=/webhooks/payment/halyk/5ee46e6a5aedaf3831617a7919fd078262665c3f1aafac0b status=405 bytes=3523 duration=1.873198ms remote_addr=193.93.56.115
+Исправь, пожалуйста
+
+Теперь такая ошибка -  level=WARN msg="вебхук оплаты отклонён" service=nado provider=halyk error="payment: halyk callback: нет invoiceId ()"
+time=2026-09-29T21:34:57.453+05:00 level=INFO msg="запрос обработан" service=nado request_id=my.profitbot.kz/uIu8YNQ6e2-000079 method=GET path=/webhooks/payment/halyk/5ee46e6a5aedaf3831617a7919fd078262665c3f1aafac0b status=200 bytes=43 duration=6.701036ms remote_addr=193.93.56.115
+Исправь, пожалуйста. Возможно тебе поможет файл docs/project/kaspi_samples/PaymentsController.php, функция EpaySuccess
+
+В кабинете клиента на сайте продавца сделай, пожалуйста, нормальную таблицу заказов со статусами оплаты и если не оплачен - с кнопкой Оплатить и переходом на оплату
+

@@ -230,6 +230,13 @@ func builtinFuncs(imageCDN string) template.FuncMap {
 		},
 		"now":  time.Now,
 		"year": func() int { return time.Now().Year() },
+		// formatDate форматирует время по Go-макету; нулевое время — пусто.
+		"formatDate": func(layout string, t time.Time) string {
+			if t.IsZero() {
+				return ""
+			}
+			return t.Format(layout)
+		},
 		// initial — первая буква строки в верхнем регистре (для значка-логотипа).
 		// По рунам, чтобы не резать UTF-8 (кириллица, казахские буквы).
 		"initial": func(s string) string {
