@@ -163,17 +163,21 @@ func (h *PageHandler) renderMethodForm(w http.ResponseWriter, r *http.Request, s
 	return h.Render.Render(w, status, "store_payment_edit", data)
 }
 
-// --- Подписка платформе ---
+// --- Подписка магазина ---
 
-// Billing — GET /billing: статус подписки, тарифы и выбор способа оплаты.
-func (h *PageHandler) Billing(w http.ResponseWriter, r *http.Request) error {
-	l := h.localizer(r)
-	p := tenant.FromContext(r.Context())
-	if p == nil {
-		redirect(w, r, i18n.Localize(l.Lang(), "/login")+"?next="+i18n.Localize(l.Lang(), "/billing"))
+// billingBase — адрес страницы подписки магазина.
+func billingBase(lang i18n.Lang, storeID int64) string {
+	return i18n.Localize(lang, fmt.Sprintf("/stores/%d/billing", storeID))
+}
+
+// StoreBilling — GET /stores/{id}/billing: подписка магазина, тарифы и оплата.
+func (h *PageHandler) StoreBilling(w http.ResponseWriter, r *http.Request) error {
+	p, storeID, ok := h.requireStore(w, r)
+	if !ok {
 		return nil
 	}
-	sub, err := h.Payments.Subscription(r.Context(), p.AccountID)
+	l := h.localizer(r)
+	sub, err := h.Payments.Subscription(r.Context(), p.AccountID, storeID)
 	if err != nil {
 		return err
 	}
@@ -187,6 +191,8 @@ func (h *PageHandler) Billing(w http.ResponseWriter, r *http.Request) error {
 
 	active := sub.Status == "active" && sub.Until.After(time.Now())
 	data := h.page(r, "billing.title").
+		With("StoreID", storeID).
+		With("StoreName", h.storeName(r, p.AccountID, storeID)).
 		With("Status", sub.Status).
 		With("Active", active).
 		With("Until", sub.Until).
@@ -194,28 +200,28 @@ func (h *PageHandler) Billing(w http.ResponseWriter, r *http.Request) error {
 		With("Plans", h.planViews(l)).
 		With("PayEnabled", len(opts) > 0).
 		With("Methods", opts).
-		With("SubscribeAction", i18n.Localize(l.Lang(), "/billing/subscribe")).
+		With("SubscribeAction", billingBase(l.Lang(), storeID)+"/subscribe").
+		With("AccountURL", i18n.Localize(l.Lang(), "/account")).
 		With("Paid", r.URL.Query().Get("paid") == "1")
 	return h.Render.Render(w, http.StatusOK, "billing", data)
 }
 
-// BillingSubscribe — POST /billing/subscribe: оплатить тариф выбранным провайдером.
-func (h *PageHandler) BillingSubscribe(w http.ResponseWriter, r *http.Request) error {
-	l := h.localizer(r)
-	p := tenant.FromContext(r.Context())
-	if p == nil {
-		redirect(w, r, i18n.Localize(l.Lang(), "/login"))
+// StoreBillingSubscribe — POST /stores/{id}/billing/subscribe.
+func (h *PageHandler) StoreBillingSubscribe(w http.ResponseWriter, r *http.Request) error {
+	p, storeID, ok := h.requireStore(w, r)
+	if !ok {
 		return nil
 	}
+	l := h.localizer(r)
 	if err := parseForm(w, r); err != nil {
 		return err
 	}
 	plan := r.PostFormValue("plan")
 	provider := r.PostFormValue("provider")
 	origin := h.publicOrigin(r)
-	success := origin + i18n.Localize(l.Lang(), "/billing") + "?paid=1"
+	success := origin + billingBase(l.Lang(), storeID) + "?paid=1"
 
-	res, err := h.Payments.StartSubscriptionPayment(r.Context(), p.AccountID, plan, provider, origin, success, success)
+	res, err := h.Payments.StartSubscriptionPayment(r.Context(), p.AccountID, storeID, plan, provider, origin, success, success)
 	if errors.Is(err, service.ErrSubscriptionNoPay) {
 		return httpx.ErrBadRequest(l.T("billing.pay_unavailable"))
 	}
@@ -228,7 +234,8 @@ func (h *PageHandler) BillingSubscribe(w http.ResponseWriter, r *http.Request) e
 	}
 	data := h.page(r, "billing.title").
 		With("RefToken", res.RefToken).
-		With("ConfirmAction", i18n.Localize(l.Lang(), "/billing/confirm"))
+		With("BillingURL", billingBase(l.Lang(), storeID)).
+		With("ConfirmAction", billingBase(l.Lang(), storeID)+"/confirm")
 	if res.Widget != nil {
 		w.Header().Set("Content-Security-Policy", halykCSP())
 		data = data.With("Widget", res.Widget)
@@ -236,20 +243,19 @@ func (h *PageHandler) BillingSubscribe(w http.ResponseWriter, r *http.Request) e
 	return h.Render.Render(w, http.StatusOK, "billing_pay", data)
 }
 
-// BillingConfirmDev — POST /billing/confirm: подтверждение оплаты dev-провайдером.
-func (h *PageHandler) BillingConfirmDev(w http.ResponseWriter, r *http.Request) error {
-	l := h.localizer(r)
-	p := tenant.FromContext(r.Context())
-	if p == nil {
-		redirect(w, r, i18n.Localize(l.Lang(), "/login"))
+// StoreBillingConfirmDev — POST /stores/{id}/billing/confirm: dev-подтверждение.
+func (h *PageHandler) StoreBillingConfirmDev(w http.ResponseWriter, r *http.Request) error {
+	p, storeID, ok := h.requireStore(w, r)
+	if !ok {
 		return nil
 	}
+	l := h.localizer(r)
 	if err := parseForm(w, r); err != nil {
 		return err
 	}
 	if err := h.Payments.ConfirmDevSubscription(r.Context(), p.AccountID, r.PostFormValue("ref")); err != nil {
 		return err
 	}
-	redirect(w, r, i18n.Localize(l.Lang(), "/billing")+"?paid=1")
+	redirect(w, r, billingBase(l.Lang(), storeID)+"?paid=1")
 	return nil
 }

@@ -22,7 +22,6 @@ func NewPlanCatalog() *PlanCatalog {
 			Price: money.FromMajor(20000, money.KZT),
 			Features: []model.PlanFeature{
 				{Key: "pf.no_commission", Included: true},
-				{Key: "pf.stores_1", Included: true},
 				{Key: "pf.products_1000", Included: true},
 				{Key: "pf.marketplaces_1", Included: true},
 				{Key: "pf.sync_60", Included: true},
@@ -38,7 +37,6 @@ func NewPlanCatalog() *PlanCatalog {
 			Popular: true,
 			Features: []model.PlanFeature{
 				{Key: "pf.no_commission", Included: true},
-				{Key: "pf.stores_1", Included: true},
 				{Key: "pf.products_10000", Included: true},
 				{Key: "pf.marketplaces_3", Included: true},
 				{Key: "pf.sync_30", Included: true},
@@ -53,7 +51,6 @@ func NewPlanCatalog() *PlanCatalog {
 			Price: money.FromMajor(50000, money.KZT),
 			Features: []model.PlanFeature{
 				{Key: "pf.no_commission", Included: true},
-				{Key: "pf.stores_3", Included: true},
 				{Key: "pf.products_unlimited", Included: true},
 				{Key: "pf.marketplaces_all", Included: true},
 				{Key: "pf.sync_15", Included: true},

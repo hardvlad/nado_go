@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"nado_go/internal/model"
+	"nado_go/internal/service"
 )
 
 type ctxKey int
@@ -19,6 +20,7 @@ const (
 	prefixKey
 	customerKey
 	cartCountKey
+	cartSummaryKey
 )
 
 // WithCustomer/CustomerFrom переносят вошедшего покупателя (или nil) в контексте.
@@ -38,6 +40,17 @@ func WithCartCount(ctx context.Context, n int) context.Context {
 func CartCountFrom(ctx context.Context) int {
 	n, _ := ctx.Value(cartCountKey).(int)
 	return n
+}
+
+// WithCartSummary/CartSummaryFrom переносят итог корзины (кол-во и сумма) для шапки.
+func WithCartSummary(ctx context.Context, s service.CartSummary) context.Context {
+	return context.WithValue(ctx, cartSummaryKey, s)
+}
+
+// CartSummaryFrom возвращает итог корзины из контекста (нули, если нет).
+func CartSummaryFrom(ctx context.Context) service.CartSummary {
+	s, _ := ctx.Value(cartSummaryKey).(service.CartSummary)
+	return s
 }
 
 // WithPrefix кладёт префикс URL витрины (/shop/{slug} в dev, "" в проде) для

@@ -808,3 +808,18 @@ nado-go-conventions (`references/jobs-queue.md`).
 - **Вебхук** `/webhooks/payment/{provider}/{token}` без изменений: сперва матчим
   токен платформенного мерчанта этого провайдера (подписка), иначе — метод
   магазина по (provider, token). Отменяет одиночную модель из D-40.
+
+## D-44. Подписка на уровне магазина (а не аккаунта)
+**Дата:** 2026-09-29 · **Источник:** подписка оформляется на каждый магазин, срок продления привязан к магазину
+
+- Статус/срок/тариф подписки перенесены в `dbo.stores` (`subscription_status`,
+  `subscription_until`, `plan_code`; миграция 0018). Колонки `accounts.subscription_*`
+  из 0016 больше не используются (оставлены, чистка — отдельной задачей).
+- `payments` для подписки теперь несёт `store_id`; проводка активирует подписку
+  магазина (`PaymentRepository.ActivateStoreSubscription`,
+  `GetStoreSubscription`). `StartSubscriptionPayment(accountID, storeID, plan, provider, ...)`.
+- Кабинет: страница подписки переехала на `/stores/{id}/billing` (+`/subscribe`,
+  `/confirm`), ссылка «Подписка» — в карточку магазина на `/account` (не в общий
+  aside). На карточке показывается «Подписка оплачена до …» либо остаток пробного
+  периода. `model.Store` получил `SubscriptionStatus/Until/PlanCode` +
+  `SubscriptionActive()`; `ListStores` их выбирает. Дополняет D-40/D-43.

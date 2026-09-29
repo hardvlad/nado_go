@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"nado_go/internal/i18n"
+	"nado_go/internal/money"
 )
 
 // baseData собирает переменные, общие для всех страниц витрины.
@@ -38,7 +39,16 @@ func (h *Handler) baseData(r *http.Request, titleKey string) map[string]any {
 		"ThemeMode": themeMode(r),
 		"Customer":  CustomerFrom(ctx),
 		"CartCount": CartCountFrom(ctx),
+		"AssetVer":  h.AssetVer,
 		"Query":     "",
+	}
+	// Сумма корзины для шапки (под иконкой), если в корзине есть товары.
+	if sum := CartSummaryFrom(ctx); sum.Count > 0 && sum.TotalMinor > 0 {
+		cur := sum.Currency
+		if cur == "" {
+			cur = store.BaseCurrency
+		}
+		data["CartTotal"] = money.Money{Minor: sum.TotalMinor, Currency: money.Currency(cur)}.Format(lang)
 	}
 	// Канонический адрес — на основном домене магазина (только когда он известен,
 	// т.е. в проде с выбором по Host).

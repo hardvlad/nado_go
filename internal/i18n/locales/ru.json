@@ -465,6 +465,8 @@
   "categories.delete": "Удалить категорию",
   "categories.err_name_required": "Укажите название категории на языке магазина по умолчанию.",
   "account.store_payments": "Оплаты",
+  "account.store_billing": "Подписка",
+  "account.sub_active": "Подписка оплачена до {{.Date}}",
   "account.billing_link": "Подписка и оплата",
   "pay.title": "Приём оплат",
   "pay.lead": "Подключите свой мерчант-аккаунт — деньги покупателей идут напрямую вам.",

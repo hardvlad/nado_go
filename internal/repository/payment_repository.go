@@ -287,49 +287,51 @@ func (r *PaymentRepository) DeleteStorePaymentMethod(ctx context.Context, accoun
 	return nil
 }
 
-// --- Подписка аккаунта ---
+// --- Подписка магазина ---
 
-// Subscription — состояние подписки аккаунта на платформу.
+// Subscription — состояние подписки магазина на платформу.
 type Subscription struct {
 	Status   string
 	Until    time.Time
 	PlanCode string
 }
 
-// GetSubscription возвращает статус подписки аккаунта.
-func (r *PaymentRepository) GetSubscription(ctx context.Context, accountID int64) (*Subscription, error) {
+// GetStoreSubscription возвращает статус подписки магазина. Изоляция по account_id.
+func (r *PaymentRepository) GetStoreSubscription(ctx context.Context, accountID, storeID int64) (*Subscription, error) {
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
-	const q = `SELECT subscription_status, subscription_until, plan_code FROM dbo.accounts WHERE id = @id;`
+	const q = `SELECT subscription_status, subscription_until, ISNULL(plan_code, '')
+		FROM dbo.stores WHERE id = @store AND account_id = @acc;`
 	var (
 		s     Subscription
 		until sql.NullTime
 	)
-	err := r.db.QueryRowContext(ctx, q, sql.Named("id", accountID)).Scan(&s.Status, &until, &s.PlanCode)
+	err := r.db.QueryRowContext(ctx, q, sql.Named("store", storeID), sql.Named("acc", accountID)).
+		Scan(&s.Status, &until, &s.PlanCode)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, database.ErrNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("repository: подписка аккаунта %d: %w", accountID, database.MapError(err))
+		return nil, fmt.Errorf("repository: подписка магазина %d: %w", storeID, database.MapError(err))
 	}
 	s.Until = until.Time
 	return &s, nil
 }
 
-// ActivateSubscription продлевает подписку: статус active и until (максимум из
-// текущего и нового, чтобы оплата продлевала, а не сбрасывала остаток).
-func (r *PaymentRepository) ActivateSubscription(ctx context.Context, accountID int64, planCode string, until time.Time) error {
+// ActivateStoreSubscription продлевает подписку магазина: статус active и until
+// (максимум из текущего и нового, чтобы оплата продлевала, а не сбрасывала остаток).
+func (r *PaymentRepository) ActivateStoreSubscription(ctx context.Context, accountID, storeID int64, planCode string, until time.Time) error {
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
 	const q = `
-		UPDATE dbo.accounts
+		UPDATE dbo.stores
 		SET subscription_status = 'active', plan_code = @plan,
 		    subscription_until = CASE WHEN subscription_until IS NULL OR subscription_until < @until THEN @until ELSE subscription_until END
-		WHERE id = @id;`
+		WHERE id = @store AND account_id = @acc;`
 	_, err := r.db.ExecContext(ctx, q,
-		sql.Named("plan", planCode), sql.Named("until", until), sql.Named("id", accountID))
+		sql.Named("plan", planCode), sql.Named("until", until), sql.Named("store", storeID), sql.Named("acc", accountID))
 	if err != nil {
-		return fmt.Errorf("repository: активация подписки аккаунта %d: %w", accountID, database.MapError(err))
+		return fmt.Errorf("repository: активация подписки магазина %d: %w", storeID, database.MapError(err))
 	}
 	return nil
 }

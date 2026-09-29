@@ -465,6 +465,8 @@
   "categories.delete": "Санатты жою",
   "categories.err_name_required": "Дүкеннің әдепкі тілінде санат атауын көрсетіңіз.",
   "account.store_payments": "Төлемдер",
+  "account.store_billing": "Жазылым",
+  "account.sub_active": "Жазылым {{.Date}} дейін төленген",
   "account.billing_link": "Жазылым және төлем",
   "pay.title": "Төлем қабылдау",
   "pay.lead": "Өз мерчант-аккаунтыңызды қосыңыз — сатып алушылардың ақшасы тікелей сізге түседі.",

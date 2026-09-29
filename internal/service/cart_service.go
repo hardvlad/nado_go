@@ -94,3 +94,23 @@ func (s *CartService) Count(ctx context.Context, storeID int64, token string) in
 	}
 	return n
 }
+
+// CartSummary — краткий итог корзины для шапки (количество и сумма).
+type CartSummary struct {
+	Count      int
+	TotalMinor int64
+	Currency   string
+}
+
+// Summary возвращает количество и сумму корзины для шапки. Ошибки не критичны —
+// при сбое возвращается пустой итог, шапка просто не покажет сумму.
+func (s *CartService) Summary(ctx context.Context, storeID int64, token string) CartSummary {
+	if token == "" {
+		return CartSummary{}
+	}
+	count, total, currency, err := s.carts.SummaryByToken(ctx, storeID, token)
+	if err != nil {
+		return CartSummary{}
+	}
+	return CartSummary{Count: count, TotalMinor: total, Currency: currency}
+}

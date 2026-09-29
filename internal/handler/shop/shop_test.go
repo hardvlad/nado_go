@@ -49,6 +49,9 @@ func (f fakeCart) View(context.Context, int64, string, string, string) (*model.C
 	return f.cart, nil
 }
 func (f fakeCart) Count(context.Context, int64, string) int { return 0 }
+func (f fakeCart) Summary(context.Context, int64, string) service.CartSummary {
+	return service.CartSummary{}
+}
 
 type fakeOrders struct{ order *model.Order }
 

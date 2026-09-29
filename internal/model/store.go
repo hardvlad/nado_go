@@ -22,6 +22,16 @@ type Store struct {
 	ConnectionStatus string // active | invalid | paused | ""
 	OrdersSyncAt     time.Time
 	TrialEndsAt      time.Time // конец пробного периода (нулевое — без пробного)
+
+	// Подписка магазина (D-44): оформляется и продлевается по каждому магазину.
+	SubscriptionStatus string    // trialing | active | past_due
+	SubscriptionUntil  time.Time // до какого момента оплачено (нулевое — не оплачивалось)
+	PlanCode           string    // выбранный тариф магазина
+}
+
+// SubscriptionActive — подписка магазина оплачена и ещё действует.
+func (s Store) SubscriptionActive() bool {
+	return !s.SubscriptionUntil.IsZero() && time.Now().Before(s.SubscriptionUntil)
 }
 
 // TrialDaysLeft — сколько полных дней осталось до конца пробного периода

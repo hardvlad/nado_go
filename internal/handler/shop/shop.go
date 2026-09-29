@@ -42,6 +42,7 @@ type CartOps interface {
 	Remove(ctx context.Context, storeID int64, token string, variantID int64) error
 	View(ctx context.Context, storeID int64, token, lang, defLang string) (*model.Cart, error)
 	Count(ctx context.Context, storeID int64, token string) int
+	Summary(ctx context.Context, storeID int64, token string) service.CartSummary
 }
 
 // OrderOps — оформление и просмотр заказов (реализуется service.OrderService).
@@ -71,6 +72,7 @@ type Deps struct {
 	I18n        *i18n.Bundle
 	NotFound    http.HandlerFunc // 404 платформы, когда магазин не найден/выключен
 	Prod        bool             // прод: Secure-cookie и HSTS
+	AssetVer    string           // версия для ?v= у CSS/JS темы (сброс кэша при релизе)
 	Log         *slog.Logger
 }
 
@@ -244,10 +246,12 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, store *model.Sto
 			}
 		}
 	}
-	// Число позиций в корзине для бейджа шапки.
+	// Количество и сумма корзины для шапки.
 	if h.Cart != nil {
 		if c, err := r.Cookie(cartCookie); err == nil {
-			ctx = WithCartCount(ctx, h.Cart.Count(ctx, store.ID, c.Value))
+			sum := h.Cart.Summary(ctx, store.ID, c.Value)
+			ctx = WithCartCount(ctx, sum.Count)
+			ctx = WithCartSummary(ctx, sum)
 		}
 	}
 	ctx = context.WithValue(ctx, chi.RouteCtxKey, chi.NewRouteContext())

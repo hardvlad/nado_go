@@ -105,6 +105,26 @@ func (r *CartRepository) CountByToken(ctx context.Context, storeID int64, token 
 	return n, nil
 }
 
+// SummaryByToken возвращает число единиц и сумму корзины (для шапки) одним
+// запросом. Цена берётся из store_offers на момент показа. Нет корзины — нули.
+func (r *CartRepository) SummaryByToken(ctx context.Context, storeID int64, token string) (count int, totalMinor int64, currency string, err error) {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `
+		SELECT ISNULL(SUM(ci.qty), 0),
+		       ISNULL(SUM(ci.qty * o.price_minor), 0),
+		       ISNULL(MAX(o.currency), '')
+		FROM dbo.carts c
+		JOIN dbo.cart_items ci ON ci.cart_id = c.id
+		LEFT JOIN dbo.store_offers o ON o.store_id = c.store_id AND o.variant_id = ci.variant_id
+		WHERE c.token = @token AND c.store_id = @store;`
+	if err := r.db.QueryRowContext(ctx, query, sql.Named("token", token), sql.Named("store", storeID)).
+		Scan(&count, &totalMinor, &currency); err != nil {
+		return 0, 0, "", fmt.Errorf("repository: итог корзины: %w", database.MapError(err))
+	}
+	return count, totalMinor, currency, nil
+}
+
 // Lines возвращает позиции корзины с актуальной ценой, наличием и данными показа.
 func (r *CartRepository) Lines(ctx context.Context, storeID, cartID int64, lang, defLang string) ([]model.CartLine, error) {
 	ctx, cancel := r.db.Context(ctx)

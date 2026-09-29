@@ -9,8 +9,8 @@
   {{ with .Description }}<meta name="description" content="{{ . }}">{{ end }}
   <meta name="color-scheme" content="light dark">
   {{ with .Canonical }}<link rel="canonical" href="{{ . }}">{{ end }}
-  <link rel="stylesheet" href="{{ .Prefix }}/static/css/theme.css">
-  <script src="{{ .Prefix }}/static/js/theme.js" defer></script>
+  <link rel="stylesheet" href="{{ .Prefix }}/static/css/theme.css{{ with .AssetVer }}?v={{ . }}{{ end }}">
+  <script src="{{ .Prefix }}/static/js/theme.js{{ with .AssetVer }}?v={{ . }}{{ end }}" defer></script>
   {{ block "head_extra" . }}{{ end }}
 </head>
 <body>

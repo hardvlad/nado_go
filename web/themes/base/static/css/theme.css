@@ -359,3 +359,27 @@ h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2rem); letter-spacing: -.01em; }
   .search-form { order: 3; max-width: none; flex-basis: 100%; }
   .site-header__spacer { display: none; }
 }
+
+/* Карточка товара: ссылка + быстрый заказ (кол-во и «В корзину») */
+.card__link { display: flex; flex-direction: column; flex: 1; color: var(--color-text); text-decoration: none; }
+.card__link:hover { text-decoration: none; }
+.card__add { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 0 12px 12px; }
+.card__add--muted { justify-content: flex-start; }
+.card__qty {
+  width: 56px; min-height: 40px; padding: 8px; text-align: center; font-size: 1rem;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--color-bg); color: var(--color-text);
+}
+.card__qty:focus { outline: none; border-color: var(--color-primary); }
+.card__add-btn { flex: 0 0 auto; }
+.card__add .card__out { color: var(--color-text-muted); font-size: .9rem; }
+
+/* Корзина: поле количества с автосохранением (без кнопки «Обновить») */
+.qty-form { display: flex; align-items: center; gap: 8px; }
+.qty-form .qty-input { width: 72px; min-height: 40px; text-align: center; }
+
+/* Шапка: корзина со значком и суммой под ним */
+.cart-link { position: static; display: inline-flex; flex-direction: column; align-items: center; gap: 2px; color: var(--color-text); }
+.cart-link:hover { text-decoration: none; }
+.cart-link__btn { position: relative; }
+.cart-link__sum { font-size: .78rem; font-weight: 700; line-height: 1; white-space: nowrap; }

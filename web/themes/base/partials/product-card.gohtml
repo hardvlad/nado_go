@@ -1,15 +1,25 @@
 {{/* Карточка товара в сетке. Ожидает dict: "P" (товар), "L", "LangBase", "Lang". */}}
 {{ define "product-card" }}
 {{ $p := .P }}
-<a class="card" href="{{ .LangBase }}/p/{{ $p.Slug }}-{{ $p.ID }}">
-  <div class="card__media">
-    {{ if and $p.OldPriceMinor (gt $p.OldPriceMinor $p.PriceMinor) }}<span class="discount-badge">−{{ percentOff $p.OldPriceMinor $p.PriceMinor }}%</span>{{ end }}
-    {{ if $p.Images }}<img src="{{ img (index $p.Images 0) }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
-  </div>
-  <div class="card__body">
-    <span class="card__title">{{ $p.Title }}</span>
-    <span class="card__price">{{ money $p.PriceMinor $p.Currency .Lang }}{{ if $p.OldPriceMinor }}<span class="card__old">{{ money $p.OldPriceMinor $p.Currency .Lang }}</span>{{ end }}</span>
-    {{ if not $p.Available }}<span class="card__out">{{ .L.T "shop.out_of_stock" }}</span>{{ end }}
-  </div>
-</a>
+<div class="card">
+  <a class="card__link" href="{{ .LangBase }}/p/{{ $p.Slug }}-{{ $p.ID }}">
+    <div class="card__media">
+      {{ if and $p.OldPriceMinor (gt $p.OldPriceMinor $p.PriceMinor) }}<span class="discount-badge">−{{ percentOff $p.OldPriceMinor $p.PriceMinor }}%</span>{{ end }}
+      {{ if $p.Images }}<img src="{{ img (index $p.Images 0) }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
+    </div>
+    <div class="card__body">
+      <span class="card__title">{{ $p.Title }}</span>
+      <span class="card__price">{{ money $p.PriceMinor $p.Currency .Lang }}{{ if $p.OldPriceMinor }}<span class="card__old">{{ money $p.OldPriceMinor $p.Currency .Lang }}</span>{{ end }}</span>
+    </div>
+  </a>
+  {{ if $p.Available }}
+  <form class="card__add" method="post" action="{{ .LangBase }}/cart/add">
+    <input type="hidden" name="variant_id" value="{{ $p.VariantID }}">
+    <input class="card__qty" type="number" name="qty" value="1" min="1" max="99" inputmode="numeric" aria-label="{{ .L.T `shop.qty` }}">
+    <button class="btn btn--primary btn--sm card__add-btn" type="submit">{{ .L.T "shop.add_to_cart" }}</button>
+  </form>
+  {{ else }}
+  <div class="card__add card__add--muted"><span class="card__out">{{ .L.T "shop.out_of_stock" }}</span></div>
+  {{ end }}
+</div>
 {{ end }}

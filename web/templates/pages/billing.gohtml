@@ -3,8 +3,8 @@
 <section class="section page-section">
     <div class="container">
         <div class="section-head section-head--row">
-            <h1 class="page-head__title">{{ .L.T "billing.title" }}</h1>
-            <a class="btn btn--ghost btn--sm" href="{{ .Links.Account }}">{{ .L.T "billing.to_account" }}</a>
+            <h1 class="page-head__title">{{ .L.T "billing.title" }}{{ with .StoreName }} · {{ . }}{{ end }}</h1>
+            <a class="btn btn--ghost btn--sm" href="{{ .AccountURL }}">{{ .L.T "billing.to_account" }}</a>
         </div>
 
         {{ if .Paid }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "billing.paid") }}{{ end }}

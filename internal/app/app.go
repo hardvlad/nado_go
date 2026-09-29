@@ -269,6 +269,14 @@ func New(ctx context.Context, version string) (*App, error) {
 	customerAuth := service.NewCustomerAuthService(
 		repository.NewCustomerRepository(db), box, sender, codeMessage, !cfg.IsProduction(), log)
 
+	// Версия статики темы для сброса кэша браузера. Для тегированной сборки —
+	// version; иначе (dev) — метка времени старта, чтобы правки CSS/JS
+	// подхватывались после перезапуска (тема отдаётся с max-age=3600).
+	assetVer := version
+	if assetVer == "" || assetVer == "dev" {
+		assetVer = fmt.Sprintf("%d", time.Now().Unix())
+	}
+
 	shopHandler := shop.New(shop.Deps{
 		Stores:      repository.NewStoreRepository(db),
 		Catalog:     service.NewStorefrontService(repository.NewCatalogRepository(db)),
@@ -281,6 +289,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		I18n:        bundle,
 		NotFound:    pages.NotFound,
 		Prod:        cfg.IsProduction(),
+		AssetVer:    assetVer,
 		Log:         log,
 	})
 

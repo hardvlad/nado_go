@@ -307,8 +307,8 @@ func (s *PaymentService) PlatformMethods() []PlatformMethod {
 // PlatformPayEnabled — доступен ли хотя бы один способ оплаты подписки.
 func (s *PaymentService) PlatformPayEnabled() bool { return len(s.PlatformMethods()) > 0 }
 
-// StartSubscriptionPayment создаёт платёж за подписку выбранным провайдером.
-func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID int64, planCode, provider, origin, successURL, failURL string) (*StartResult, error) {
+// StartSubscriptionPayment создаёт платёж за подписку магазина выбранным провайдером.
+func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID, storeID int64, planCode, provider, origin, successURL, failURL string) (*StartResult, error) {
 	pp, ok := s.cfg.Platform[provider]
 	if !ok || !platformAvailable(provider, pp) {
 		return nil, ErrSubscriptionNoPay
@@ -324,7 +324,7 @@ func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID
 
 	ref := "s-" + randToken(24)
 	if _, err := s.payments.CreatePayment(ctx, repository.NewPayment{
-		AccountID: accountID, Purpose: "subscription", Provider: provider,
+		AccountID: accountID, StoreID: storeID, Purpose: "subscription", Provider: provider,
 		RefToken: ref, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
 		PlanCode: planCode, PeriodDays: s.cfg.SubscriptionDays,
 	}); err != nil {
@@ -359,9 +359,12 @@ func (s *PaymentService) ConfirmDevSubscription(ctx context.Context, accountID i
 	return s.settleSubscription(ctx, p)
 }
 
-// Subscription возвращает состояние подписки аккаунта.
-func (s *PaymentService) Subscription(ctx context.Context, accountID int64) (*repository.Subscription, error) {
-	sub, err := s.payments.GetSubscription(ctx, accountID)
+// Subscription возвращает состояние подписки магазина.
+func (s *PaymentService) Subscription(ctx context.Context, accountID, storeID int64) (*repository.Subscription, error) {
+	sub, err := s.payments.GetStoreSubscription(ctx, accountID, storeID)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, httpx.ErrNotFound("Магазин не найден")
+	}
 	if err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
@@ -457,7 +460,7 @@ func (s *PaymentService) settleSubscription(ctx context.Context, p *repository.P
 		days = s.cfg.SubscriptionDays
 	}
 	until := time.Now().Add(time.Duration(days) * 24 * time.Hour)
-	return s.payments.ActivateSubscription(ctx, updated.AccountID, updated.PlanCode, until)
+	return s.payments.ActivateStoreSubscription(ctx, updated.AccountID, updated.StoreID, updated.PlanCode, until)
 }
 
 func (s *PaymentService) credsFor(m *repository.StorePaymentMethod) (payment.Credentials, error) {

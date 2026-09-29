@@ -465,6 +465,8 @@
   "categories.delete": "Delete category",
   "categories.err_name_required": "Enter the category name in the store default language.",
   "account.store_payments": "Payments",
+  "account.store_billing": "Subscription",
+  "account.sub_active": "Subscription paid until {{.Date}}",
   "account.billing_link": "Subscription & billing",
   "pay.title": "Accept payments",
   "pay.lead": "Connect your own merchant account — customer money goes straight to you.",

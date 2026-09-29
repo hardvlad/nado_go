@@ -127,9 +127,9 @@ func (h *PageHandler) Routes() chi.Router {
 		r.Get("/stores/{id}/payments/{provider}", h.wrap(h.StorePaymentMethodForm))
 		r.Post("/stores/{id}/payments/{provider}", h.wrap(h.StorePaymentMethodSubmit))
 		r.Post("/stores/{id}/payments/{provider}/delete", h.wrap(h.StorePaymentMethodDelete))
-		r.Get("/billing", h.wrap(h.Billing))
-		r.Post("/billing/subscribe", h.wrap(h.BillingSubscribe))
-		r.Post("/billing/confirm", h.wrap(h.BillingConfirmDev))
+		r.Get("/stores/{id}/billing", h.wrap(h.StoreBilling))
+		r.Post("/stores/{id}/billing/subscribe", h.wrap(h.StoreBillingSubscribe))
+		r.Post("/stores/{id}/billing/confirm", h.wrap(h.StoreBillingConfirmDev))
 	}
 
 	// Подключение через кабинет Kaspi (служебный сотрудник по SMS-коду владельца).
@@ -217,7 +217,7 @@ func (h *PageHandler) ensureLocalizer(r *http.Request) *http.Request {
 type Links struct {
 	Home, Contact, Register, RegisterVerify, Login, Logout, Account string
 	Phone, PhoneVerify, StoreNew, KaspiCabinet, Orders              string
-	StoreOrders, Billing                                            string
+	StoreOrders                                                     string
 }
 
 func linksFor(lang i18n.Lang) Links {
@@ -235,7 +235,6 @@ func linksFor(lang i18n.Lang) Links {
 		KaspiCabinet:   i18n.Localize(lang, "/stores/kaspi"),
 		Orders:         i18n.Localize(lang, "/orders"),
 		StoreOrders:    i18n.Localize(lang, "/store-orders"),
-		Billing:        i18n.Localize(lang, "/billing"),
 	}
 }
 

@@ -1,3 +1,4 @@
+{{ define "head_extra" }}<script src="{{ .Prefix }}/static/js/cart.js{{ with .AssetVer }}?v={{ . }}{{ end }}" defer></script>{{ end }}
 {{ define "content" }}
 <h1 class="section-title">{{ .L.T "shop.cart_title" }}</h1>
 {{ if .Cart.Lines }}
@@ -10,10 +11,10 @@
     <div>
       <a href="{{ $.LangBase }}/p/{{ .Slug }}-{{ .ProductID }}">{{ .Title }}</a>
       <div class="muted">{{ money .PriceMinor .Currency $.Lang }}{{ if not .InStock }} · {{ $.L.T "shop.out_of_stock" }}{{ end }}</div>
-      <form method="post" action="{{ $.LangBase }}/cart/update" class="row-between mt-12">
+      <form method="post" action="{{ $.LangBase }}/cart/update" class="qty-form mt-12" data-cart-line>
         <input type="hidden" name="variant_id" value="{{ .VariantID }}">
-        <input class="qty-input" type="number" name="qty" value="{{ .Qty }}" min="0" max="99" aria-label="{{ $.L.T `shop.qty` }}">
-        <button class="btn btn--outline btn--sm" type="submit">{{ $.L.T "shop.update" }}</button>
+        <input class="qty-input" type="number" name="qty" value="{{ .Qty }}" min="1" max="99" inputmode="numeric" data-cart-qty aria-label="{{ $.L.T `shop.qty` }}">
+        <noscript><button class="btn btn--outline btn--sm" type="submit">{{ $.L.T "shop.update" }}</button></noscript>
       </form>
     </div>
     <div>

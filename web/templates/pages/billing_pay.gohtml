@@ -9,7 +9,7 @@
         {{ if .Widget }}
         <div class="form-card">
             <div id="halyk-pay" data-config="{{ .Widget.ConfigJSON }}"></div>
-            <p class="form-card__footer"><a href="{{ .Links.Billing }}">{{ .L.T "billing.to_account" }}</a></p>
+            <p class="form-card__footer"><a href="{{ .BillingURL }}">{{ .L.T "billing.to_account" }}</a></p>
         </div>
         <script src="{{ .Widget.LibURL }}" defer></script>
         <script src="/static/js/halyk-pay.js" defer></script>
@@ -17,7 +17,7 @@
         <form class="form-card" method="post" action="{{ .ConfirmAction }}">
             <input type="hidden" name="ref" value="{{ .RefToken }}">
             <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "billing.pay_confirm" }}</button>
-            <p class="form-card__footer"><a href="{{ .Links.Billing }}">{{ .L.T "billing.to_account" }}</a></p>
+            <p class="form-card__footer"><a href="{{ .BillingURL }}">{{ .L.T "billing.to_account" }}</a></p>
         </form>
         {{ end }}
     </div>

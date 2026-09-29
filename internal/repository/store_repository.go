@@ -436,7 +436,8 @@ func (r *StoreRepository) ListStores(ctx context.Context, accountID int64) ([]mo
 
 	const query = `
 		SELECT s.id, s.name, s.slug, s.status, s.base_currency,
-		       ISNULL(c.marketplace, ''), ISNULL(c.status, ''), c.orders_sync_at, s.trial_ends_at
+		       ISNULL(c.marketplace, ''), ISNULL(c.status, ''), c.orders_sync_at, s.trial_ends_at,
+		       s.subscription_status, s.subscription_until, ISNULL(s.plan_code, '')
 		FROM dbo.stores s
 		LEFT JOIN dbo.marketplace_connections c ON c.store_id = s.id
 		WHERE s.account_id = @account_id AND s.status <> 'archived'
@@ -453,13 +454,16 @@ func (r *StoreRepository) ListStores(ctx context.Context, accountID int64) ([]mo
 			s       model.Store
 			syncAt  sql.NullTime
 			trialAt sql.NullTime
+			subUp   sql.NullTime
 		)
 		if err := rows.Scan(&s.ID, &s.Name, &s.Slug, &s.Status, &s.BaseCurrency,
-			&s.Marketplace, &s.ConnectionStatus, &syncAt, &trialAt); err != nil {
+			&s.Marketplace, &s.ConnectionStatus, &syncAt, &trialAt,
+			&s.SubscriptionStatus, &subUp, &s.PlanCode); err != nil {
 			return nil, fmt.Errorf("repository: чтение магазина: %w", err)
 		}
 		s.OrdersSyncAt = syncAt.Time
 		s.TrialEndsAt = trialAt.Time
+		s.SubscriptionUntil = subUp.Time
 		out = append(out, s)
 	}
 	return out, rows.Err()

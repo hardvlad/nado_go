@@ -29,7 +29,9 @@
                             <span class="badge badge--{{ if eq .Status "active" }}active{{ else }}muted{{ end }}">{{ .Status }}</span>
                         </div>
                         <p class="store-card__slug"><a href="{{ .URL }}" target="_blank" rel="noopener">{{ $.L.T "account.store_open" }}{{ template "icon" "arrow" }}</a></p>
-                        {{ if .TrialActive }}
+                        {{ if .SubscriptionActive }}
+                        <p class="store-card__trial">{{ $.L.T "account.sub_active" "Date" (formatDate "02.01.2006" .SubscriptionUntil) }}</p>
+                        {{ else if .TrialActive }}
                         <p class="store-card__trial">{{ $.L.T "account.trial_left" "Days" .TrialDaysLeft "Date" (formatDate "02.01.2006 15:04" .TrialEndsAt) }}</p>
                         {{ else if not .TrialEndsAt.IsZero }}
                         <p class="store-card__trial text-danger">{{ $.L.T "account.trial_expired" "Date" (formatDate "02.01.2006 15:04" .TrialEndsAt) }}</p>
@@ -50,6 +52,7 @@
                             <a href="{{ .CatalogURL }}">{{ $.L.T "account.store_catalog" }}</a>
                             <a href="{{ .CategoriesURL }}">{{ $.L.T "account.store_categories" }}</a>
                             <a href="{{ .PaymentsURL }}">{{ $.L.T "account.store_payments" }}</a>
+                            <a href="{{ .BillingURL }}">{{ $.L.T "account.store_billing" }}</a>
                             <a href="{{ .EditURL }}">{{ $.L.T "account.store_edit" }}</a>
                         </p>
                     </li>
@@ -65,7 +68,6 @@
                     <dt>{{ .L.T "account.account" }}</dt><dd>{{ .Principal.AccountName }}</dd>
                     {{ with .Principal.Email }}<dt>{{ $.L.T "form.email" }}</dt><dd>{{ . }}</dd>{{ end }}
                 </dl>
-                <p class="store-card__actions"><a href="{{ .Links.Billing }}">{{ .L.T "account.billing_link" }}</a></p>
                 <form method="post" action="{{ .Links.Logout }}">
                     <button class="btn btn--ghost" type="submit">{{ template "icon" "logout" }}{{ .L.T "account.logout" }}</button>
                 </form>
