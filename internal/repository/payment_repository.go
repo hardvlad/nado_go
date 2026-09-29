@@ -150,6 +150,7 @@ type StorePaymentSettings struct {
 	Provider         string
 	IsEnabled        bool
 	MerchantID       string
+	Terminal         string
 	SecretCiphertext []byte
 	Testing          bool
 	WebhookToken     string
@@ -162,7 +163,7 @@ func (r *PaymentRepository) GetStorePaymentSettings(ctx context.Context, account
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
 	const q = `
-		SELECT store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''),
+		SELECT store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''), ISNULL(terminal_id, ''),
 		       secret_ciphertext, testing_mode, ISNULL(webhook_token, '')
 		FROM dbo.store_payment_settings WHERE store_id = @store AND account_id = @acc;`
 	var (
@@ -170,7 +171,7 @@ func (r *PaymentRepository) GetStorePaymentSettings(ctx context.Context, account
 		secret []byte
 	)
 	err := r.db.QueryRowContext(ctx, q, sql.Named("store", storeID), sql.Named("acc", accountID)).
-		Scan(&s.StoreID, &s.AccountID, &s.Provider, &s.IsEnabled, &s.MerchantID, &secret, &s.Testing, &s.WebhookToken)
+		Scan(&s.StoreID, &s.AccountID, &s.Provider, &s.IsEnabled, &s.MerchantID, &s.Terminal, &secret, &s.Testing, &s.WebhookToken)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -188,7 +189,7 @@ func (r *PaymentRepository) ResolveStorePaymentByToken(ctx context.Context, prov
 	ctx, cancel := r.db.Context(ctx)
 	defer cancel()
 	const q = `
-		SELECT store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''),
+		SELECT store_id, account_id, provider, is_enabled, ISNULL(merchant_id, ''), ISNULL(terminal_id, ''),
 		       secret_ciphertext, testing_mode, ISNULL(webhook_token, '')
 		FROM dbo.store_payment_settings WHERE provider = @provider AND webhook_token = @token;`
 	var (
@@ -196,7 +197,7 @@ func (r *PaymentRepository) ResolveStorePaymentByToken(ctx context.Context, prov
 		secret []byte
 	)
 	err := r.db.QueryRowContext(ctx, q, sql.Named("provider", provider), sql.Named("token", token)).
-		Scan(&s.StoreID, &s.AccountID, &s.Provider, &s.IsEnabled, &s.MerchantID, &secret, &s.Testing, &s.WebhookToken)
+		Scan(&s.StoreID, &s.AccountID, &s.Provider, &s.IsEnabled, &s.MerchantID, &s.Terminal, &secret, &s.Testing, &s.WebhookToken)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, database.ErrNotFound
 	}
@@ -215,6 +216,7 @@ type SaveStorePaymentSettingsInput struct {
 	Provider         string
 	IsEnabled        bool
 	MerchantID       string
+	Terminal         string
 	Testing          bool
 	SecretCiphertext []byte // nil — не менять секрет
 	UpdateSecret     bool
@@ -233,16 +235,17 @@ func (r *PaymentRepository) SaveStorePaymentSettings(ctx context.Context, in Sav
 		USING (SELECT @store AS store_id) AS s
 		ON t.store_id = s.store_id
 		WHEN MATCHED THEN UPDATE SET
-			provider = @provider, is_enabled = @enabled, merchant_id = @merchant, testing_mode = @testing,
+			provider = @provider, is_enabled = @enabled, merchant_id = @merchant, terminal_id = @terminal, testing_mode = @testing,
 			secret_ciphertext = CASE WHEN @update_secret = 1 THEN @secret ELSE t.secret_ciphertext END,
 			webhook_token = CASE WHEN @update_token = 1 THEN @token ELSE t.webhook_token END,
 			updated_at = SYSUTCDATETIME()
-		WHEN NOT MATCHED THEN INSERT (store_id, account_id, provider, is_enabled, merchant_id, testing_mode, secret_ciphertext, webhook_token)
-			VALUES (@store, @acc, @provider, @enabled, @merchant, @testing, @secret, @token);`
+		WHEN NOT MATCHED THEN INSERT (store_id, account_id, provider, is_enabled, merchant_id, terminal_id, testing_mode, secret_ciphertext, webhook_token)
+			VALUES (@store, @acc, @provider, @enabled, @merchant, @terminal, @testing, @secret, @token);`
 	_, err := r.db.ExecContext(ctx, q,
 		sql.Named("store", in.StoreID), sql.Named("acc", in.AccountID),
 		sql.Named("provider", in.Provider), sql.Named("enabled", boolBit(in.IsEnabled)),
-		sql.Named("merchant", nullString(in.MerchantID)), sql.Named("testing", boolBit(in.Testing)),
+		sql.Named("merchant", nullString(in.MerchantID)), sql.Named("terminal", nullString(in.Terminal)),
+		sql.Named("testing", boolBit(in.Testing)),
 		sql.Named("update_secret", boolBit(in.UpdateSecret)), sql.Named("secret", nullBytes(in.SecretCiphertext)),
 		sql.Named("update_token", boolBit(in.UpdateToken)), sql.Named("token", nullString(in.WebhookToken)),
 	)

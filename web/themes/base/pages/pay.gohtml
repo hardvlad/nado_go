@@ -11,7 +11,13 @@
     <span>{{ money $o.TotalMinor $o.Currency .Lang }}</span>
   </div>
 
-  {{ if .Manual }}
+  {{ if .Widget }}
+  <p class="pay-note mt-12">{{ .L.T "shop.pay_widget_note" }}</p>
+  <div id="halyk-pay" data-config="{{ .Widget.ConfigJSON }}"></div>
+  <p class="mt-12"><a class="btn btn--outline btn--block" href="{{ .LangBase }}/order/{{ $o.Number }}?t={{ .OrderToken }}">{{ .L.T "shop.pay_back_to_order" }}</a></p>
+  <script src="{{ .Widget.LibURL }}" defer></script>
+  <script src="{{ .Prefix }}/static/js/halyk-pay.js" defer></script>
+  {{ else if .Manual }}
   <p class="pay-note mt-12">{{ .L.T "shop.pay_kaspi_note" }}</p>
   <p class="mt-12"><a class="btn btn--outline btn--block" href="{{ .LangBase }}/order/{{ $o.Number }}?t={{ .OrderToken }}">{{ .L.T "shop.pay_back_to_order" }}</a></p>
   {{ else }}

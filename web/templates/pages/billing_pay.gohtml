@@ -4,13 +4,22 @@
     <div class="container container--form">
         <header class="page-head page-head--center">
             <h1 class="page-head__title">{{ .L.T "billing.pay_title" }}</h1>
-            <p class="page-head__lead">{{ .L.T "billing.pay_dev_note" }}</p>
+            {{ if not .Widget }}<p class="page-head__lead">{{ .L.T "billing.pay_dev_note" }}</p>{{ end }}
         </header>
+        {{ if .Widget }}
+        <div class="form-card">
+            <div id="halyk-pay" data-config="{{ .Widget.ConfigJSON }}"></div>
+            <p class="form-card__footer"><a href="{{ .Links.Billing }}">{{ .L.T "billing.to_account" }}</a></p>
+        </div>
+        <script src="{{ .Widget.LibURL }}" defer></script>
+        <script src="/static/js/halyk-pay.js" defer></script>
+        {{ else }}
         <form class="form-card" method="post" action="{{ .ConfirmAction }}">
             <input type="hidden" name="ref" value="{{ .RefToken }}">
             <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "billing.pay_confirm" }}</button>
             <p class="form-card__footer"><a href="{{ .Links.Billing }}">{{ .L.T "billing.to_account" }}</a></p>
         </form>
+        {{ end }}
     </div>
 </section>
 {{ end }}

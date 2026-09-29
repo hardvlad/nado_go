@@ -18,7 +18,8 @@ BEGIN
         account_id         BIGINT        NOT NULL,
         provider           VARCHAR(20)   NOT NULL CONSTRAINT DF_store_payment_settings_provider DEFAULT ('dev'),
         is_enabled         BIT           NOT NULL CONSTRAINT DF_store_payment_settings_enabled DEFAULT (0),
-        merchant_id        NVARCHAR(200) NULL,
+        merchant_id        NVARCHAR(200) NULL,          -- ID мерчанта (Halyk: ClientID)
+        terminal_id        NVARCHAR(200) NULL,          -- терминал (Halyk ePay: TerminalID)
         secret_ciphertext  VARBINARY(4000) NULL,       -- секретный ключ мерчанта, зашифрован
         testing_mode       BIT           NOT NULL CONSTRAINT DF_store_payment_settings_testing DEFAULT (0),
         webhook_token      VARCHAR(64)   NULL,          -- секрет в пути вебхука /webhooks/payment/{provider}/{token}

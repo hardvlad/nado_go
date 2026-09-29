@@ -39,6 +39,7 @@ type Payments struct {
 	PlatformProvider     string
 	PlatformMerchantID   string
 	PlatformSecret       string
+	PlatformTerminal     string
 	PlatformTesting      bool
 	PlatformWebhookToken string // секрет в пути вебхука подписки
 }
@@ -251,6 +252,7 @@ func Load() (*Config, error) {
 			PlatformProvider:     env("PLATFORM_PAY_PROVIDER", "dev"),
 			PlatformMerchantID:   env("PLATFORM_PAY_MERCHANT_ID", ""),
 			PlatformSecret:       env("PLATFORM_PAY_SECRET", ""),
+			PlatformTerminal:     env("PLATFORM_PAY_TERMINAL", ""),
 			PlatformTesting:      envBool("PLATFORM_PAY_TESTING", false),
 			PlatformWebhookToken: env("PLATFORM_PAY_WEBHOOK_TOKEN", ""),
 		},

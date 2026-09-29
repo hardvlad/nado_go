@@ -23,9 +23,12 @@ const (
 )
 
 // Credentials — учётные данные мерчанта (расшифрованные). Secret в логи не попадает.
+// Terminal нужен провайдерам с тремя реквизитами (Halyk ePay: ClientID=MerchantID,
+// ClientSecret=Secret, TerminalID=Terminal); остальные его игнорируют.
 type Credentials struct {
 	MerchantID string
 	Secret     string
+	Terminal   string
 	Testing    bool
 }
 
@@ -43,12 +46,23 @@ type StartInput struct {
 	Creds       Credentials
 }
 
+// WidgetPage — данные для оплаты через клиентский виджет провайдера (Halyk ePay):
+// страница подключает LibURL и вызывает виджет с ConfigJSON. Рендерится с
+// ослабленной CSP (домен провайдера в script-src/frame-src).
+type WidgetPage struct {
+	LibURL     string // адрес payment-api.js провайдера
+	ConfigJSON string // JSON-конфиг для halyk.pay(...)
+}
+
 // StartResult — куда отправить покупателя.
 type StartResult struct {
 	// RedirectURL — адрес платёжной страницы провайдера. Пусто — платёж
-	// подтверждается на нашей стороне (dev-провайдер, ручной Kaspi): сервис
-	// показывает локальную страницу оплаты.
+	// подтверждается на нашей стороне (dev-провайдер, ручной Kaspi) или через
+	// виджет (Widget): сервис показывает соответствующую страницу оплаты.
 	RedirectURL string
+	// Widget — данные клиентского виджета (Halyk). Непусто — рендерим страницу
+	// виджета вместо редиректа.
+	Widget      *WidgetPage
 	ProviderRef string // идентификатор платежа у провайдера
 	Status      Status
 }

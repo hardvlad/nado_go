@@ -30,6 +30,7 @@ type PlatformPay struct {
 	Provider     string
 	MerchantID   string
 	Secret       string
+	Terminal     string
 	Testing      bool
 	WebhookToken string
 }
@@ -65,9 +66,10 @@ func (s *PaymentService) Providers() []string { return s.reg.Codes() }
 
 // StartResult — что делать витрине после инициализации платежа.
 type StartResult struct {
-	RedirectURL string // непусто — отправить покупателя на страницу провайдера
-	Local       bool   // показать локальную страницу оплаты (dev/kaspi)
-	Manual      bool   // ручное подтверждение (kaspi)
+	RedirectURL string              // непусто — отправить покупателя на страницу провайдера
+	Widget      *payment.WidgetPage // непусто — показать страницу виджета (Halyk)
+	Local       bool                // показать локальную страницу оплаты (dev/kaspi)
+	Manual      bool                // ручное подтверждение (kaspi)
 	Provider    string
 	RefToken    string
 }
@@ -79,6 +81,7 @@ type StoreSettingsView struct {
 	Provider     string
 	IsEnabled    bool
 	MerchantID   string
+	Terminal     string
 	Testing      bool
 	HasSecret    bool
 	WebhookToken string
@@ -95,7 +98,7 @@ func (s *PaymentService) StoreSettings(ctx context.Context, accountID, storeID i
 		return &StoreSettingsView{Provider: s.cfg.DefaultProvider}, nil
 	}
 	return &StoreSettingsView{
-		Provider: set.Provider, IsEnabled: set.IsEnabled, MerchantID: set.MerchantID,
+		Provider: set.Provider, IsEnabled: set.IsEnabled, MerchantID: set.MerchantID, Terminal: set.Terminal,
 		Testing: set.Testing, HasSecret: set.HasSecret, WebhookToken: set.WebhookToken,
 	}, nil
 }
@@ -105,6 +108,7 @@ type SaveStoreSettingsInput struct {
 	Provider   string
 	IsEnabled  bool
 	MerchantID string
+	Terminal   string
 	Secret     string // пусто — не менять
 	Testing    bool
 }
@@ -122,7 +126,8 @@ func (s *PaymentService) SaveStoreSettings(ctx context.Context, accountID, store
 
 	save := repository.SaveStorePaymentSettingsInput{
 		StoreID: storeID, AccountID: accountID, Provider: in.Provider,
-		IsEnabled: in.IsEnabled, MerchantID: strings.TrimSpace(in.MerchantID), Testing: in.Testing,
+		IsEnabled: in.IsEnabled, MerchantID: strings.TrimSpace(in.MerchantID),
+		Terminal: strings.TrimSpace(in.Terminal), Testing: in.Testing,
 	}
 	if in.Secret != "" {
 		cipher, err := s.box.EncryptString(in.Secret)
@@ -187,7 +192,8 @@ func (s *PaymentService) StartOrderPayment(ctx context.Context, accountID, store
 		_ = s.payments.SetProviderRef(ctx, mustGetPaymentID(ctx, s.payments, ref), res.ProviderRef)
 	}
 	return &StartResult{
-		RedirectURL: res.RedirectURL, Local: res.RedirectURL == "",
+		RedirectURL: res.RedirectURL, Widget: res.Widget,
+		Local:  res.RedirectURL == "" && res.Widget == nil,
 		Manual: prov.Manual(), Provider: set.Provider, RefToken: ref,
 	}, nil
 }
@@ -239,12 +245,12 @@ func (s *PaymentService) StartSubscriptionPayment(ctx context.Context, accountID
 		Ref: ref, AmountMinor: plan.Price.Minor, Currency: string(plan.Price.Currency),
 		Description: "Подписка nado: тариф " + planCode,
 		SuccessURL:  successURL, FailURL: failURL, CallbackURL: callback,
-		Creds: payment.Credentials{MerchantID: s.cfg.Platform.MerchantID, Secret: s.cfg.Platform.Secret, Testing: s.cfg.Platform.Testing},
+		Creds: payment.Credentials{MerchantID: s.cfg.Platform.MerchantID, Secret: s.cfg.Platform.Secret, Terminal: s.cfg.Platform.Terminal, Testing: s.cfg.Platform.Testing},
 	})
 	if err != nil {
 		return nil, httpx.ErrInternal(err)
 	}
-	return &StartResult{RedirectURL: res.RedirectURL, Local: res.RedirectURL == "", Manual: prov.Manual(), Provider: s.cfg.Platform.Provider, RefToken: ref}, nil
+	return &StartResult{RedirectURL: res.RedirectURL, Widget: res.Widget, Local: res.RedirectURL == "" && res.Widget == nil, Manual: prov.Manual(), Provider: s.cfg.Platform.Provider, RefToken: ref}, nil
 }
 
 // ConfirmDevSubscription подтверждает платёж подписки dev-провайдером.
@@ -286,7 +292,7 @@ func (s *PaymentService) HandleWebhook(ctx context.Context, provider, token stri
 
 	// Подписка платформы.
 	if s.cfg.Platform.WebhookToken != "" && provider == s.cfg.Platform.Provider && token == s.cfg.Platform.WebhookToken {
-		creds := payment.Credentials{MerchantID: s.cfg.Platform.MerchantID, Secret: s.cfg.Platform.Secret, Testing: s.cfg.Platform.Testing}
+		creds := payment.Credentials{MerchantID: s.cfg.Platform.MerchantID, Secret: s.cfg.Platform.Secret, Terminal: s.cfg.Platform.Terminal, Testing: s.cfg.Platform.Testing}
 		cb, perr := prov.ParseCallback(r, creds)
 		if perr != nil {
 			ct, b := prov.CallbackResponse(false)
@@ -367,7 +373,7 @@ func (s *PaymentService) settleSubscription(ctx context.Context, p *repository.P
 }
 
 func (s *PaymentService) credsFor(set *repository.StorePaymentSettings) (payment.Credentials, error) {
-	creds := payment.Credentials{MerchantID: set.MerchantID, Testing: set.Testing}
+	creds := payment.Credentials{MerchantID: set.MerchantID, Terminal: set.Terminal, Testing: set.Testing}
 	if len(set.SecretCiphertext) > 0 {
 		secret, err := s.box.DecryptString(set.SecretCiphertext)
 		if err != nil {

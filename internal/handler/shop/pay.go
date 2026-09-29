@@ -4,9 +4,18 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
+	"nado_go/internal/integration/payment"
 	"nado_go/internal/service"
 )
+
+// halykCSP — CSP страницы виджета Halyk: домены ePay в script-src/frame-src.
+func halykCSP() string {
+	hosts := strings.Join(payment.HalykScriptHosts, " ")
+	return "default-src 'self'; img-src 'self' data: https:; style-src 'self'; " +
+		"script-src 'self' " + hosts + "; frame-src " + hosts + "; connect-src 'self' " + hosts + "; base-uri 'self'"
+}
 
 // origin возвращает scheme://host текущего запроса (для абсолютных ссылок
 // возврата и вебхука).
@@ -60,13 +69,17 @@ func (h *Handler) payStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Локальная страница оплаты (dev-подтверждение или инструкции Kaspi).
+	// Страница оплаты: виджет провайдера (Halyk), dev-подтверждение или инструкции Kaspi.
 	data := h.baseData(r, "shop.pay_title")
 	data["Order"] = order
 	data["RefToken"] = res.RefToken
 	data["Manual"] = res.Manual
 	data["Provider"] = res.Provider
 	data["OrderToken"] = token
+	if res.Widget != nil {
+		w.Header().Set("Content-Security-Policy", halykCSP())
+		data["Widget"] = res.Widget
+	}
 	h.render(w, r, http.StatusOK, "pay", data)
 }
 

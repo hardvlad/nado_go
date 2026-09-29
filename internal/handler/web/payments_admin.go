@@ -5,13 +5,22 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"nado_go/internal/httpx"
 	"nado_go/internal/i18n"
+	"nado_go/internal/integration/payment"
 	"nado_go/internal/service"
 	"nado_go/internal/tenant"
 )
+
+// halykCSP — CSP страницы виджета Halyk ePay: домены ePay в script-src/frame-src.
+func halykCSP() string {
+	hosts := strings.Join(payment.HalykScriptHosts, " ")
+	return "default-src 'self'; img-src 'self' data: https:; style-src 'self'; " +
+		"script-src 'self' " + hosts + "; frame-src " + hosts + "; connect-src 'self' " + hosts + "; base-uri 'self'"
+}
 
 // Кабинет: настройки приёма оплат магазином и оплата подписки платформе.
 
@@ -56,6 +65,7 @@ func (h *PageHandler) StorePaymentsSubmit(w http.ResponseWriter, r *http.Request
 		Provider:   r.PostFormValue("provider"),
 		IsEnabled:  r.PostFormValue("enabled") != "",
 		MerchantID: r.PostFormValue("merchant_id"),
+		Terminal:   r.PostFormValue("terminal_id"),
 		Secret:     r.PostFormValue("secret"),
 		Testing:    r.PostFormValue("testing") != "",
 	}
@@ -151,10 +161,14 @@ func (h *PageHandler) BillingSubscribe(w http.ResponseWriter, r *http.Request) e
 		redirect(w, r, res.RedirectURL)
 		return nil
 	}
-	// Локальное подтверждение (dev-провайдер).
 	data := h.page(r, "billing.title").
 		With("RefToken", res.RefToken).
 		With("ConfirmAction", i18n.Localize(l.Lang(), "/billing/confirm"))
+	if res.Widget != nil {
+		// Виджет Halyk: ослабляем CSP (домены ePay) и рендерим страницу виджета.
+		w.Header().Set("Content-Security-Policy", halykCSP())
+		data = data.With("Widget", res.Widget)
+	}
 	return h.Render.Render(w, http.StatusOK, "billing_pay", data)
 }
 

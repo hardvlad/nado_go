@@ -764,3 +764,26 @@ nado-go-conventions (`references/jobs-queue.md`).
   единицам). Тема не покрывается `web/tokens_test.go` (тот сканирует только
   платформенные `web/static/css` и `web/templates`), поэтому сырые цвета токенов
   темы допустимы; правила компонентов темы используют только `var()`.
+
+## D-42. Halyk ePay как способ оплаты (витрина + подписка)
+**Дата:** 2026-09-29 · **Источник:** добавить Halyk Pay по референсу docs/project/kaspi_samples/EPay.php
+
+- **Провайдер `payment.Halyk`** в общем слое (D-40): OAuth `client_credentials`
+  (invoiceID=наш ref, amount в тенге=minor/100, terminal, postLink) → клиентский
+  **виджет** `halyk.pay(config)`. Отличается от Freedom Pay: не редирект, а страница
+  с виджетом. Для этого в `payment.StartResult`/`service.StartResult` добавлен
+  `Widget{LibURL, ConfigJSON}`; витрина (shop/pay.go, pay.gohtml) и кабинет
+  (BillingSubscribe, billing_pay.gohtml) рендерят страницу виджета.
+- **Три реквизита мерчанта:** ClientID=MerchantID, ClientSecret=Secret,
+  TerminalID=Terminal. Добавлены: `payment.Credentials.Terminal`,
+  `store_payment_settings.terminal_id` (миграция 0016), поле формы «ID терминала»,
+  `PLATFORM_PAY_TERMINAL` для подписки. Адреса ePay (oauth/lib, test/prod) —
+  константы провайдера, выбор по `creds.Testing`.
+- **CSP:** страница виджета отдаётся с ослабленной политикой (домены ePay в
+  `script-src`/`frame-src`/`connect-src`), перекрывая строгую CSP витрины/кабинета
+  в самом хендлере. Inline-скриптов нет: `halyk.pay` вызывает самохостируемый
+  `halyk-pay.js`, читающий конфиг из `data-config` (в теме и в web/static).
+- **Вебхук:** postLink ePay = наш `/webhooks/payment/halyk/{token}` (тот же
+  роутинг D-40). `ParseCallback` разбирает JSON тела; успех по code/status.
+  ВАЖНО (fast-follow): для прода добавить перепроверку статуса через ePay
+  check-status API — сейчас доверяем телу postLink + токену в пути.

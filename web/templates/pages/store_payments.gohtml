@@ -26,6 +26,10 @@
                 <input class="input" id="merchant_id" name="merchant_id" type="text" maxlength="200" value="{{ .Settings.MerchantID }}">
             </div>
             <div class="field">
+                <label class="field__label" for="terminal_id">{{ .L.T "pay.terminal" }} <span class="field__optional">({{ .L.T "pay.terminal_hint" }})</span></label>
+                <input class="input" id="terminal_id" name="terminal_id" type="text" maxlength="200" value="{{ .Settings.Terminal }}">
+            </div>
+            <div class="field">
                 <label class="field__label" for="secret">{{ .L.T "pay.secret" }} <span class="field__optional">({{ .L.T "form.optional" }})</span></label>
                 <input class="input" id="secret" name="secret" type="password" autocomplete="new-password" maxlength="400"
                     placeholder="{{ if .Settings.HasSecret }}{{ .L.T `pay.secret_set` }}{{ else }}{{ .L.T `pay.secret_ph` }}{{ end }}">
