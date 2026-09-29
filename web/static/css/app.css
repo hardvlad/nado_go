@@ -111,6 +111,9 @@ a:hover { color: var(--color-primary-hover); }
 .reset-row:last-child { border-bottom: none; }
 .form-card--danger { border-color: var(--color-danger); }
 
+.code-block { display: block; padding: 10px 12px; background: var(--color-surface-2); border-radius: var(--radius-s); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; }
+.plans--cabinet { margin-top: 16px; }
+
 .muted { color: var(--color-text-muted); }
 .small { font-size: 14px; }
 

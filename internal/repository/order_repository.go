@@ -278,6 +278,22 @@ func (r *OrderRepository) GetByNumber(ctx context.Context, storeID, number int64
 	return &o, nil
 }
 
+// MarkPaid помечает заказ оплаченным по id (идемпотентно: повторный вебхук не
+// меняет уже оплаченный заказ).
+func (r *OrderRepository) MarkPaid(ctx context.Context, orderID, paymentID int64) error {
+	ctx, cancel := r.db.Context(ctx)
+	defer cancel()
+	const query = `
+		UPDATE dbo.orders
+		SET status = @paid, paid_at = SYSUTCDATETIME(), payment_id = @pid
+		WHERE id = @id AND status <> @paid;`
+	if _, err := r.db.ExecContext(ctx, query,
+		sql.Named("paid", model.OrderPaid), sql.Named("pid", paymentID), sql.Named("id", orderID)); err != nil {
+		return fmt.Errorf("repository: отметка оплаты заказа %d: %w", orderID, database.MapError(err))
+	}
+	return nil
+}
+
 // ListByCustomer возвращает заказы покупателя (для кабинета).
 func (r *OrderRepository) ListByCustomer(ctx context.Context, storeID, customerID int64) ([]model.Order, error) {
 	ctx, cancel := r.db.Context(ctx)

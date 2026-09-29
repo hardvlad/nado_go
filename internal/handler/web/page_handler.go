@@ -35,6 +35,7 @@ type Deps struct {
 	Onboarding  *service.KaspiOnboardingService
 	StoreOrders *service.OrderService       // заказы витрины (для кабинета продавца)
 	Catalog     *service.CatalogEditService // редактирование категорий и товаров
+	Payments    *service.PaymentService     // оплаты магазина и подписка платформе
 	Feedback    *service.FeedbackService
 	// SecureCookies — cookie только по HTTPS и с префиксом __Host-.
 	// В проде обязательно, локально по http — выключено.
@@ -118,6 +119,15 @@ func (h *PageHandler) Routes() chi.Router {
 		r.Get("/stores/{id}/categories/{cid}/edit", h.wrap(h.CategoryEditForm))
 		r.Post("/stores/{id}/categories/{cid}/edit", h.wrap(h.CategoryEditSubmit))
 		r.Post("/stores/{id}/categories/{cid}/delete", h.wrap(h.CategoryDelete))
+	}
+
+	// Оплаты: настройки приёма оплат магазином и подписка платформе.
+	if h.Payments != nil {
+		r.Get("/stores/{id}/payments", h.wrap(h.StorePaymentsForm))
+		r.Post("/stores/{id}/payments", h.wrap(h.StorePaymentsSubmit))
+		r.Get("/billing", h.wrap(h.Billing))
+		r.Post("/billing/subscribe", h.wrap(h.BillingSubscribe))
+		r.Post("/billing/confirm", h.wrap(h.BillingConfirmDev))
 	}
 
 	// Подключение через кабинет Kaspi (служебный сотрудник по SMS-коду владельца).
@@ -205,7 +215,7 @@ func (h *PageHandler) ensureLocalizer(r *http.Request) *http.Request {
 type Links struct {
 	Home, Contact, Register, RegisterVerify, Login, Logout, Account string
 	Phone, PhoneVerify, StoreNew, KaspiCabinet, Orders              string
-	StoreOrders                                                     string
+	StoreOrders, Billing                                            string
 }
 
 func linksFor(lang i18n.Lang) Links {
@@ -223,6 +233,7 @@ func linksFor(lang i18n.Lang) Links {
 		KaspiCabinet:   i18n.Localize(lang, "/stores/kaspi"),
 		Orders:         i18n.Localize(lang, "/orders"),
 		StoreOrders:    i18n.Localize(lang, "/store-orders"),
+		Billing:        i18n.Localize(lang, "/billing"),
 	}
 }
 

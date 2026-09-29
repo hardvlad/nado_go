@@ -1,4 +1,9 @@
 {{ define "content" }}
+<section class="hero">
+  <h1>{{ .Store.Name }}</h1>
+  <p>{{ .L.T "shop.hero_lead" }}</p>
+</section>
+
 {{ if .Categories }}
 <h2 class="section-title">{{ .L.T "shop.categories" }}</h2>
 <ul class="chips">

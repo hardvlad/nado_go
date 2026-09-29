@@ -1,23 +1,36 @@
 {{ define "content" }}
 {{ $o := .Order }}
+{{ $paid := eq $o.Status "paid" }}
 <div class="panel panel--narrow">
+  {{ if $paid }}
+  <div class="alert alert--success">{{ .L.T "shop.order_paid_note" }}</div>
+  {{ else }}
   <div class="alert alert--success">{{ .L.T "shop.order_created" }}</div>
-  <h1>{{ .L.T "shop.order_number" }} {{ $o.Number }}</h1>
-  <p class="muted">{{ .L.T "shop.order_status" }}: {{ .L.T (printf "shop.status_%s" $o.Status) }}</p>
+  {{ end }}
+
+  <div class="order-head">
+    <h1>{{ .L.T "shop.order_number" }} {{ $o.Number }}</h1>
+    <span class="status-pill {{ if $paid }}status-pill--paid{{ else if eq $o.Status "canceled" }}status-pill--canceled{{ else }}status-pill--pending{{ end }}">
+      {{ .L.T (printf "shop.status_%s" $o.Status) }}
+    </span>
+  </div>
+
+  {{ if not $paid }}
+  <a class="btn btn--primary btn--lg btn--block mt-12" href="{{ .LangBase }}/pay/{{ $o.Number }}?t={{ $o.Token }}">{{ .L.T "shop.pay_now" }}</a>
+  {{ end }}
 
   <h2 class="section-title">{{ .L.T "shop.order_items" }}</h2>
   {{ range $o.Items }}
-  <div class="row-between mt-12">
+  <div class="summary-line">
     <span>{{ .Title }} × {{ .Qty }}</span>
     <span>{{ money .LineMinor $o.Currency $.Lang }}</span>
   </div>
   {{ end }}
-  <div class="cart-total">
+  <div class="summary-line summary-line--total">
     <span>{{ .L.T "shop.order_total" }}</span>
     <span>{{ money $o.TotalMinor $o.Currency .Lang }}</span>
   </div>
 
-  <p class="muted">{{ .L.T "shop.pay_later_note" }}</p>
-  <p class="mt-12"><a class="btn btn--outline" href="{{ .LangBase }}/">{{ .L.T "shop.continue_shopping" }}</a></p>
+  <p class="mt-24"><a class="btn btn--outline" href="{{ .LangBase }}/">{{ .L.T "shop.continue_shopping" }}</a></p>
 </div>
 {{ end }}

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"nado_go/internal/money"
 )
@@ -229,5 +230,20 @@ func builtinFuncs(imageCDN string) template.FuncMap {
 		},
 		"now":  time.Now,
 		"year": func() int { return time.Now().Year() },
+		// initial — первая буква строки в верхнем регистре (для значка-логотипа).
+		// По рунам, чтобы не резать UTF-8 (кириллица, казахские буквы).
+		"initial": func(s string) string {
+			for _, r := range s {
+				return string(unicode.ToUpper(r))
+			}
+			return ""
+		},
+		// percentOff — размер скидки в процентах (старая → новая цена), округлённый.
+		"percentOff": func(oldMinor, newMinor int64) int64 {
+			if oldMinor <= 0 || newMinor >= oldMinor {
+				return 0
+			}
+			return int64(float64(oldMinor-newMinor)/float64(oldMinor)*100 + 0.5)
+		},
 	}
 }

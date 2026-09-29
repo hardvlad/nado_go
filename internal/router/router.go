@@ -34,6 +34,7 @@ type Deps struct {
 	Health          *api.HealthHandler
 	JobsAPI         *jobsapi.Handler
 	GreenAPIWebhook *webhook.GreenAPI
+	PaymentWebhook  *webhook.Payment
 }
 
 // New возвращает корневой http.Handler приложения.
@@ -71,6 +72,9 @@ func New(d Deps) http.Handler {
 	// Вебхуки провайдеров: без CSRF, аутентификация по токену в самом обработчике.
 	if d.GreenAPIWebhook != nil {
 		r.Mount("/webhooks/greenapi", d.GreenAPIWebhook.Routes())
+	}
+	if d.PaymentWebhook != nil {
+		r.Mount("/webhooks/payment", d.PaymentWebhook.Routes())
 	}
 
 	// Витрина магазина в локальном режиме: /shop/{slug}/... . Отдельный контур:

@@ -51,6 +51,12 @@ type OrderOps interface {
 	CustomerOrders(ctx context.Context, storeID, customerID int64) ([]model.Order, error)
 }
 
+// PaymentOps — приём оплаты заказа (реализуется service.PaymentService).
+type PaymentOps interface {
+	StartOrderPayment(ctx context.Context, accountID, storeID int64, order *model.Order, origin, successURL, failURL string) (*service.StartResult, error)
+	ConfirmDevOrder(ctx context.Context, accountID, storeID int64, ref string) error
+}
+
 // Deps — зависимости витрины.
 type Deps struct {
 	Stores      Resolver
@@ -58,6 +64,7 @@ type Deps struct {
 	Customers   CustomerAuth
 	Cart        CartOps
 	Orders      OrderOps
+	Payments    PaymentOps
 	Render      *theme.Renderer
 	ThemeStatic fs.FS // статика тем (web/themes), отдаётся под /static
 	I18n        *i18n.Bundle
@@ -118,6 +125,11 @@ func (h *Handler) buildRoutes() http.Handler {
 		r.Get("/checkout", h.checkoutPage)
 		r.Post("/checkout", h.placeOrder)
 		r.Get("/order/{number}", h.orderPage)
+
+		if h.Payments != nil {
+			r.Get("/pay/{number}", h.payStart)
+			r.Post("/pay/{number}/confirm", h.payConfirmDev)
+		}
 
 		r.Get("/login", h.loginForm)
 		r.Post("/login", h.requestCode)

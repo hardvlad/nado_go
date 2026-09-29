@@ -1,0 +1,26 @@
+{{ define "content" }}
+{{ $o := .Order }}
+<div class="panel panel--narrow">
+  <div class="order-head">
+    <h1>{{ .L.T "shop.pay_title" }}</h1>
+    <span class="status-pill status-pill--pending">{{ .L.T "shop.status_awaiting_payment" }}</span>
+  </div>
+
+  <div class="summary-line summary-line--total">
+    <span>{{ .L.T "shop.order_number" }} {{ $o.Number }}</span>
+    <span>{{ money $o.TotalMinor $o.Currency .Lang }}</span>
+  </div>
+
+  {{ if .Manual }}
+  <p class="pay-note mt-12">{{ .L.T "shop.pay_kaspi_note" }}</p>
+  <p class="mt-12"><a class="btn btn--outline btn--block" href="{{ .LangBase }}/order/{{ $o.Number }}?t={{ .OrderToken }}">{{ .L.T "shop.pay_back_to_order" }}</a></p>
+  {{ else }}
+  <p class="pay-note mt-12">{{ .L.T "shop.pay_dev_note" }}</p>
+  <form class="mt-12" method="post" action="{{ .LangBase }}/pay/{{ $o.Number }}/confirm">
+    <input type="hidden" name="ref" value="{{ .RefToken }}">
+    <input type="hidden" name="t" value="{{ .OrderToken }}">
+    <button class="btn btn--primary btn--lg btn--block" type="submit">{{ .L.T "shop.pay_confirm" }}</button>
+  </form>
+  {{ end }}
+</div>
+{{ end }}

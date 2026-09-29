@@ -310,6 +310,7 @@ func (h *PageHandler) Account(w http.ResponseWriter, r *http.Request) error {
 				EditURL:       i18n.Localize(l.Lang(), "/stores/"+idStr+"/edit"),
 				CatalogURL:    i18n.Localize(l.Lang(), "/stores/"+idStr+"/catalog"),
 				CategoriesURL: i18n.Localize(l.Lang(), "/stores/"+idStr+"/categories"),
+				PaymentsURL:   i18n.Localize(l.Lang(), "/stores/"+idStr+"/payments"),
 			})
 		}
 	}
@@ -330,6 +331,7 @@ type StoreCard struct {
 	EditURL       string // адрес формы редактирования
 	CatalogURL    string // список товаров магазина
 	CategoriesURL string // управление категориями
+	PaymentsURL   string // настройки приёма оплат
 }
 
 // storeURL строит адрес витрины: в проде поддомен, локально — префикс /shop/{slug}.

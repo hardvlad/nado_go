@@ -1,0 +1,47 @@
+{{/* Кабинет: подписка на платформу — статус и оплата тарифа. */}}
+{{ define "content" }}
+<section class="section page-section">
+    <div class="container">
+        <div class="section-head section-head--row">
+            <h1 class="page-head__title">{{ .L.T "billing.title" }}</h1>
+            <a class="btn btn--ghost btn--sm" href="{{ .Links.Account }}">{{ .L.T "billing.to_account" }}</a>
+        </div>
+
+        {{ if .Paid }}{{ template "alert" dict "Kind" "success" "Text" (.L.T "billing.paid") }}{{ end }}
+
+        <div class="aside-card">
+            {{ if .Active }}
+            <p>{{ .L.T "billing.active" }} <strong>{{ upper .CurrentPlan }}</strong>.
+               {{ .L.T "billing.until" }} {{ formatDate "02.01.2006" .Until }}.</p>
+            {{ else if eq .Status "trialing" }}
+            <p>{{ .L.T "billing.trialing" }}</p>
+            {{ else }}
+            <p class="text-danger">{{ .L.T "billing.inactive" }}</p>
+            {{ end }}
+        </div>
+
+        {{ if not .PayEnabled }}
+        {{ template "alert" dict "Kind" "info" "Text" (.L.T "billing.pay_unavailable") }}
+        {{ end }}
+
+        <div class="plans plans--cabinet">
+            {{ range .Plans }}
+            <div class="plan-card{{ if .Popular }} plan-card--popular{{ end }}">
+                <h3 class="plan-card__name">{{ .Name }}</h3>
+                <p class="plan-card__price">{{ .Price }} <span class="muted">/ {{ $.L.T "billing.month" }}</span></p>
+                <p class="plan-card__tagline">{{ .Tagline }}</p>
+                <ul class="plan-card__features" role="list">
+                    {{ range .Features }}<li class="{{ if .Included }}is-in{{ else }}is-out{{ end }}">{{ .Text }}</li>{{ end }}
+                </ul>
+                {{ if $.PayEnabled }}
+                <form method="post" action="{{ $.SubscribeAction }}">
+                    <input type="hidden" name="plan" value="{{ .Code }}">
+                    <button class="btn btn--primary btn--block" type="submit">{{ $.L.T "billing.subscribe" }}</button>
+                </form>
+                {{ end }}
+            </div>
+            {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}

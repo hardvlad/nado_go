@@ -24,6 +24,7 @@ import (
 	"nado_go/internal/i18n"
 	"nado_go/internal/integration/marketplace/kaspi"
 	"nado_go/internal/integration/messaging/greenapi"
+	"nado_go/internal/integration/payment"
 	"nado_go/internal/jobs"
 	"nado_go/internal/mailbox"
 	"nado_go/internal/repository"
@@ -213,7 +214,23 @@ func New(ctx context.Context, version string) (*App, error) {
 
 	// Заказы витрины: один сервис и для публичной части (checkout), и для кабинета.
 	cartRepo := repository.NewCartRepository(db)
-	orderService := service.NewOrderService(repository.NewOrderRepository(db), cartRepo)
+	orderRepo := repository.NewOrderRepository(db)
+	orderService := service.NewOrderService(orderRepo, cartRepo)
+
+	// Слой онлайн-оплат: заказы витрины (мерчант продавца, D-01) и подписка
+	// платформе (мерчант nado). Провайдеры за интерфейсом payment.Provider.
+	paymentRegistry := payment.NewRegistry(payment.NewDev(), payment.NewFreedomPay(), payment.NewKaspi())
+	paymentService := service.NewPaymentService(
+		repository.NewPaymentRepository(db), orderRepo, box, paymentRegistry, plans,
+		service.PaymentConfig{
+			DefaultProvider:  cfg.Payments.DefaultProvider,
+			SubscriptionDays: cfg.Payments.SubscriptionDays,
+			Platform: service.PlatformPay{
+				Provider: cfg.Payments.PlatformProvider, MerchantID: cfg.Payments.PlatformMerchantID,
+				Secret: cfg.Payments.PlatformSecret, Testing: cfg.Payments.PlatformTesting,
+				WebhookToken: cfg.Payments.PlatformWebhookToken,
+			},
+		}, log)
 
 	// Редактирование каталога из кабинета (категории и товары, D-14/D-23).
 	catalogEdit := service.NewCatalogEditService(
@@ -229,6 +246,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		Onboarding:    onboardingService,
 		StoreOrders:   orderService,
 		Catalog:       catalogEdit,
+		Payments:      paymentService,
 		Feedback:      feedbackService,
 		SecureCookies: cfg.IsProduction(),
 		PublicURL:     cfg.App.PublicURL,
@@ -258,6 +276,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		Customers:   customerAuth,
 		Cart:        service.NewCartService(cartRepo),
 		Orders:      orderService,
+		Payments:    paymentService,
 		Render:      themeRenderer,
 		ThemeStatic: themesFS,
 		I18n:        bundle,
@@ -277,6 +296,7 @@ func New(ctx context.Context, version string) (*App, error) {
 		Health:          health,
 		JobsAPI:         jobsAPI,
 		GreenAPIWebhook: webhook.NewGreenAPI(whatsappRepo, cfg.Messaging.GreenAPIWebhookToken, log),
+		PaymentWebhook:  webhook.NewPayment(paymentService, log),
 	})
 
 	server := &http.Server{

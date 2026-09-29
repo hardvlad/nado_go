@@ -3,6 +3,7 @@
 {{ $p := .P }}
 <a class="card" href="{{ .LangBase }}/p/{{ $p.Slug }}-{{ $p.ID }}">
   <div class="card__media">
+    {{ if and $p.OldPriceMinor (gt $p.OldPriceMinor $p.PriceMinor) }}<span class="discount-badge">−{{ percentOff $p.OldPriceMinor $p.PriceMinor }}%</span>{{ end }}
     {{ if $p.Images }}<img src="{{ img (index $p.Images 0) }}" alt="{{ $p.Title }}" loading="lazy">{{ end }}
   </div>
   <div class="card__body">

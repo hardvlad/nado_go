@@ -49,6 +49,7 @@
                         <p class="store-card__actions">
                             <a href="{{ .CatalogURL }}">{{ $.L.T "account.store_catalog" }}</a>
                             <a href="{{ .CategoriesURL }}">{{ $.L.T "account.store_categories" }}</a>
+                            <a href="{{ .PaymentsURL }}">{{ $.L.T "account.store_payments" }}</a>
                             <a href="{{ .EditURL }}">{{ $.L.T "account.store_edit" }}</a>
                         </p>
                     </li>
@@ -64,6 +65,7 @@
                     <dt>{{ .L.T "account.account" }}</dt><dd>{{ .Principal.AccountName }}</dd>
                     {{ with .Principal.Email }}<dt>{{ $.L.T "form.email" }}</dt><dd>{{ . }}</dd>{{ end }}
                 </dl>
+                <p class="store-card__actions"><a href="{{ .Links.Billing }}">{{ .L.T "account.billing_link" }}</a></p>
                 <form method="post" action="{{ .Links.Logout }}">
                     <button class="btn btn--ghost" type="submit">{{ template "icon" "logout" }}{{ .L.T "account.logout" }}</button>
                 </form>

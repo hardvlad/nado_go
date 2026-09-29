@@ -1,16 +1,28 @@
 {{ define "header" }}
 <header class="site-header">
   <div class="container site-header__row">
-    <a class="site-header__logo" href="{{ .LangBase }}/">{{ .Store.Name }}</a>
+    <a class="site-header__logo" href="{{ .LangBase }}/">
+      <span class="logo-mark" aria-hidden="true">{{ initial .Store.Name }}</span>
+      <span>{{ .Store.Name }}</span>
+    </a>
     <form class="search-form" method="get" action="{{ .LangBase }}/search" role="search">
       <input type="search" name="q" value="{{ .Query }}" placeholder="{{ .L.T `shop.search_placeholder` }}" aria-label="{{ .L.T `shop.search` }}">
-      <button type="submit" aria-label="{{ .L.T `shop.search` }}">{{ .L.T "shop.search_go" }}</button>
+      <button type="submit" aria-label="{{ .L.T `shop.search` }}">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      </button>
     </form>
     <div class="site-header__spacer"></div>
     <div class="header-actions">
-      <button class="icon-btn" data-theme-toggle data-theme-mode="{{ .ThemeMode }}" type="button" aria-label="{{ .L.T `shop.theme` }}">◐</button>
-      <a class="icon-btn" href="{{ .LangBase }}/account" aria-label="{{ .L.T `shop.account` }}">{{ if .Customer }}●{{ else }}○{{ end }}</a>
-      <a class="icon-btn cart-link" href="{{ .LangBase }}/cart" aria-label="{{ .L.T `shop.cart` }}">🛒{{ if .CartCount }}<span class="cart-badge">{{ .CartCount }}</span>{{ end }}</a>
+      <button class="icon-btn" data-theme-toggle data-theme-mode="{{ .ThemeMode }}" type="button" aria-label="{{ .L.T `shop.theme` }}">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z"/></svg>
+      </button>
+      <a class="icon-btn" href="{{ .LangBase }}/account" aria-label="{{ .L.T `shop.account` }}">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+      </a>
+      <a class="icon-btn cart-link" href="{{ .LangBase }}/cart" aria-label="{{ .L.T `shop.cart` }}">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 12.3a1 1 0 0 0 1 .8h8.7a1 1 0 0 0 1-.8L20 8H6.5"/><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/></svg>
+        {{ if .CartCount }}<span class="cart-badge">{{ .CartCount }}</span>{{ end }}
+      </a>
     </div>
   </div>
 </header>

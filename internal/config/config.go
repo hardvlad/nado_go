@@ -25,6 +25,33 @@ type Config struct {
 	Platform  Platform
 	Trial     Trial
 	Catalog   Catalog
+	Payments  Payments
+}
+
+// Payments — приём онлайн-оплат. Магазины подключают свой мерчант в кабинете;
+// здесь только значения по умолчанию и мерчант самой платформы для подписки.
+type Payments struct {
+	// DefaultProvider — провайдер по умолчанию для новых магазинов (dev|freedompay|kaspi).
+	DefaultProvider string
+	// SubscriptionDays — длительность оплачиваемого периода подписки.
+	SubscriptionDays int
+	// Мерчант платформы для приёма оплаты подписки продавцами.
+	PlatformProvider     string
+	PlatformMerchantID   string
+	PlatformSecret       string
+	PlatformTesting      bool
+	PlatformWebhookToken string // секрет в пути вебхука подписки
+}
+
+// PlatformPayEnabled — включён ли приём оплаты подписки картой (иначе — по счёту).
+func (p Payments) PlatformPayEnabled() bool {
+	if p.PlatformProvider == "" {
+		return false
+	}
+	if p.PlatformProvider == "dev" {
+		return true
+	}
+	return p.PlatformMerchantID != "" && p.PlatformSecret != "" && p.PlatformWebhookToken != ""
 }
 
 // Catalog — регулярная переимпортация каталога и заказов из кабинетов/API.
@@ -217,6 +244,15 @@ func Load() (*Config, error) {
 		Catalog: Catalog{
 			SyncInterval:       time.Duration(envInt("KASPI_CATALOG_SYNC_INTERVAL", 21600)) * time.Second,
 			OrdersSyncInterval: time.Duration(envInt("KASPI_ORDERS_SYNC_INTERVAL", 900)) * time.Second,
+		},
+		Payments: Payments{
+			DefaultProvider:      env("PAY_DEFAULT_PROVIDER", "dev"),
+			SubscriptionDays:     envInt("SUBSCRIPTION_DAYS", 30),
+			PlatformProvider:     env("PLATFORM_PAY_PROVIDER", "dev"),
+			PlatformMerchantID:   env("PLATFORM_PAY_MERCHANT_ID", ""),
+			PlatformSecret:       env("PLATFORM_PAY_SECRET", ""),
+			PlatformTesting:      envBool("PLATFORM_PAY_TESTING", false),
+			PlatformWebhookToken: env("PLATFORM_PAY_WEBHOOK_TOKEN", ""),
 		},
 	}
 
